@@ -994,6 +994,10 @@
 
       imageWrapper.addEventListener("pointermove", (event) => {
         if (!isDragging) return;
+        if (!event.buttons) {
+          stopDragging();
+          return;
+        }
         const deltaX = event.clientX - dragStartX;
         const deltaY = event.clientY - dragStartY;
         schedulePanUpdate(panStartX + deltaX, panStartY + deltaY);
