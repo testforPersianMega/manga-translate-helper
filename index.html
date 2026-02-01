@@ -994,6 +994,10 @@
 
       imageWrapper.addEventListener("pointermove", (event) => {
         if (!isDragging) return;
+        if (!event.buttons) {
+          stopDragging();
+          return;
+        }
         const deltaX = event.clientX - dragStartX;
         const deltaY = event.clientY - dragStartY;
         schedulePanUpdate(panStartX + deltaX, panStartY + deltaY);
@@ -1015,9 +1019,15 @@
         activePointerId = null;
       };
 
+      const handlePointerLeave = (event) => {
+        if (!isDragging) return;
+        if (event.buttons) return;
+        stopDragging();
+      };
+
       imageWrapper.addEventListener("pointerup", stopDragging);
       imageWrapper.addEventListener("pointercancel", stopDragging);
-      imageWrapper.addEventListener("pointerleave", stopDragging);
+      imageWrapper.addEventListener("pointerleave", handlePointerLeave);
       imageWrapper.addEventListener("lostpointercapture", stopDragging);
       window.addEventListener("pointerup", stopDragging);
       window.addEventListener("pointercancel", stopDragging);
