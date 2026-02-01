@@ -508,6 +508,7 @@
       let dragStartY = 0;
       let panStartX = 0;
       let panStartY = 0;
+      let activePointerId = null;
       let panRaf = 0;
       let pendingPan = null;
 
@@ -968,6 +969,7 @@
         if (event.target.closest(".bubble-overlay")) return;
         if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
         isDragging = true;
+        activePointerId = event.pointerId;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
         panStartX = panX;
@@ -1003,11 +1005,23 @@
         imageWrapper.classList.remove("grabbing");
         imageStage.classList.remove("is-dragging");
         pendingPan = null;
+        if (activePointerId !== null) {
+          try {
+            imageWrapper.releasePointerCapture(activePointerId);
+          } catch (error) {
+            // Ignore release errors (e.g. capture already released).
+          }
+        }
+        activePointerId = null;
       };
 
       imageWrapper.addEventListener("pointerup", stopDragging);
       imageWrapper.addEventListener("pointercancel", stopDragging);
       imageWrapper.addEventListener("pointerleave", stopDragging);
+      imageWrapper.addEventListener("lostpointercapture", stopDragging);
+      window.addEventListener("pointerup", stopDragging);
+      window.addEventListener("pointercancel", stopDragging);
+      window.addEventListener("blur", stopDragging);
 
       const panBy = (deltaX, deltaY) => {
         if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
