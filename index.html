@@ -356,7 +356,12 @@
         </label>
         <label>
           Upload JSONs
-          <input type="file" id="jsonInput" accept="application/json" multiple />
+          <input
+            type="file"
+            id="jsonInput"
+            accept="application/json"
+            multiple
+          />
         </label>
         <button id="downloadBtn" disabled>Download JSON</button>
         <button id="downloadAllBtn" disabled>Download All JSONs</button>
@@ -385,7 +390,12 @@
             Upload an image to begin.
           </div>
           <div class="image-stage" id="imageStage">
-            <img id="mainImage" alt="Uploaded preview" />
+            <img
+              id="mainImage"
+              onselectstart="return false;"
+              draggable="false"
+              alt="Uploaded preview"
+            />
             <div class="overlay-layer" id="overlayLayer"></div>
           </div>
         </div>
@@ -472,8 +482,7 @@
       const ZOOM_STEP = 0.2;
       const PAN_STEP = 80;
 
-      const getBaseName = (filename) =>
-        filename.replace(/\.[^/.]+$/, "");
+      const getBaseName = (filename) => filename.replace(/\.[^/.]+$/, "");
 
       const getCurrentPage = () => pages[currentPageIndex] ?? null;
 
@@ -950,8 +959,9 @@
       const isTypingTarget = (eventTarget) => {
         if (!(eventTarget instanceof Element)) return false;
         return (
-          eventTarget.closest("input, textarea, select, [contenteditable='true']") !==
-          null
+          eventTarget.closest(
+            "input, textarea, select, [contenteditable='true']",
+          ) !== null
         );
       };
 
