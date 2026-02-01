@@ -1120,6 +1120,16 @@
         maxY: jsonData.image_size.height,
       });
 
+      const getNextBubbleId = (items) => {
+        const lastId = items.at(-1)?.id;
+        const lastNumber =
+          typeof lastId === "number" ? lastId : Number.parseInt(lastId, 10);
+        if (Number.isFinite(lastNumber)) {
+          return lastNumber + 1;
+        }
+        return items.length + 1;
+      };
+
       const startResize = (event, index, corner) => {
         const jsonData = getCurrentJson();
         if (!jsonData) return;
@@ -1290,7 +1300,7 @@
         const bounds = getResizeBounds(jsonData);
         const normalized = normalizeDrawBounds(drawStart, coords, bounds);
         const newItem = {
-          id: (jsonData.items.at(-1)?.id ?? jsonData.items.length) + 1,
+          id: getNextBubbleId(jsonData.items),
           text_original: "",
           text: "",
           bubble_type: "Standard",
