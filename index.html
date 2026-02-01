@@ -975,6 +975,29 @@
         updateGrabState();
       });
 
+      const handleWheelZoom = (event) => {
+        if (!mainImage.src) return;
+        if (event.target.closest(".image-toolbar")) return;
+        event.preventDefault();
+        const direction = Math.sign(event.deltaY);
+        if (!direction) return;
+        const nextZoom =
+          direction > 0 ? zoomLevel - ZOOM_STEP : zoomLevel + ZOOM_STEP;
+        const rect = imageWrapper.getBoundingClientRect();
+        const cursorX = event.clientX - rect.left - rect.width / 2;
+        const cursorY = event.clientY - rect.top - rect.height / 2;
+        const nextLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+        if (Math.abs(nextLevel - zoomLevel) < 0.0001) return;
+        const zoomRatio = nextLevel / zoomLevel;
+        panX = clampPanX(panX + (1 - zoomRatio) * (cursorX - panX));
+        panY = clampPanY(panY + (1 - zoomRatio) * (cursorY - panY));
+        applyZoom(nextLevel);
+      };
+
+      imageWrapper.addEventListener("wheel", handleWheelZoom, {
+        passive: false,
+      });
+
       imageWrapper.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
         if (event.target.closest(".image-toolbar")) return;
