@@ -116,6 +116,44 @@
         border-radius: 8px;
       }
 
+      .page-list {
+        max-height: 220px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .page-list button {
+        width: 100%;
+        text-align: left;
+        padding: 8px 12px;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        background: transparent;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .page-list button.active {
+        background: var(--accent-soft);
+        font-weight: 600;
+      }
+
+      .page-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .page-meta span {
+        background: #eef2ff;
+        color: #4338ca;
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+
       .bubble-list button {
         width: 100%;
         text-align: left;
@@ -251,19 +289,27 @@
       </div>
       <div class="toolbar">
         <label>
-          Upload Image
-          <input type="file" id="imageInput" accept="image/png, image/jpeg" />
+          Upload Images
+          <input
+            type="file"
+            id="imageInput"
+            accept="image/png, image/jpeg"
+            multiple
+          />
         </label>
         <label>
-          Upload JSON
-          <input type="file" id="jsonInput" accept="application/json" />
+          Upload JSONs
+          <input type="file" id="jsonInput" accept="application/json" multiple />
         </label>
         <button id="downloadBtn" disabled>Download JSON</button>
+        <button id="downloadAllBtn" disabled>Download All JSONs</button>
       </div>
     </header>
 
     <main>
       <section class="panel left-panel">
+        <strong>Pages</strong>
+        <div class="page-list" id="pageList"></div>
         <strong>Bubble List</strong>
         <div class="bubble-list" id="bubbleList"></div>
       </section>
@@ -317,12 +363,14 @@
       const imageInput = document.getElementById("imageInput");
       const jsonInput = document.getElementById("jsonInput");
       const downloadBtn = document.getElementById("downloadBtn");
+      const downloadAllBtn = document.getElementById("downloadAllBtn");
       const statusText = document.getElementById("statusText");
       const errorText = document.getElementById("errorText");
       const mainImage = document.getElementById("mainImage");
       const imageWrapper = document.getElementById("imageWrapper");
       const imagePlaceholder = document.getElementById("imagePlaceholder");
       const overlayLayer = document.getElementById("overlayLayer");
+      const pageList = document.getElementById("pageList");
       const bubbleList = document.getElementById("bubbleList");
       const detailPlaceholder = document.getElementById("detailPlaceholder");
       const detailForm = document.getElementById("detailForm");
@@ -335,19 +383,39 @@
         (option) => option.value,
       );
 
-      let loadedImageName = "";
-      let loadedJsonName = "";
-      let jsonData = null;
+      const pages = [];
+      let currentPageIndex = -1;
       let selectedIndex = -1;
 
+      const getBaseName = (filename) =>
+        filename.replace(/\.[^/.]+$/, "");
+
+      const getCurrentPage = () => pages[currentPageIndex] ?? null;
+
+      const getCurrentJson = () => getCurrentPage()?.jsonData ?? null;
+
+      const getPageStatusTags = (page) => {
+        const tags = [];
+        if (page.imageName) tags.push("Image");
+        if (page.jsonData) tags.push("JSON");
+        return tags.length ? tags : ["Empty"];
+      };
+
       const updateStatus = () => {
-        const bubbleCount = jsonData?.items?.length ?? 0;
+        const bubbleCount = getCurrentJson()?.items?.length ?? 0;
         const parts = [];
-        if (loadedImageName) {
-          parts.push(`Image: ${loadedImageName}`);
+        if (pages.length) {
+          parts.push(`Pages: ${pages.length}`);
         }
-        if (loadedJsonName) {
-          parts.push(`JSON: ${loadedJsonName}`);
+        if (currentPageIndex >= 0) {
+          const page = getCurrentPage();
+          parts.push(`Page ${currentPageIndex + 1}`);
+          if (page?.imageName) {
+            parts.push(`Image: ${page.imageName}`);
+          }
+          if (page?.jsonName) {
+            parts.push(`JSON: ${page.jsonName}`);
+          }
         }
         if (bubbleCount) {
           parts.push(`Bubbles: ${bubbleCount}`);
@@ -355,7 +423,8 @@
         statusText.textContent = parts.length
           ? parts.join(" | ")
           : "No image or JSON loaded.";
-        downloadBtn.disabled = !jsonData;
+        downloadBtn.disabled = !getCurrentJson();
+        downloadAllBtn.disabled = !pages.some((page) => page.jsonData);
       };
 
       const setError = (message) => {
@@ -403,8 +472,32 @@
         return "";
       };
 
+      const renderPageList = () => {
+        pageList.innerHTML = "";
+        if (!pages.length) {
+          pageList.innerHTML =
+            '<div class="placeholder" style="padding: 12px;">No pages loaded.</div>';
+          return;
+        }
+        pages.forEach((page, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          const name = page.imageName || page.jsonName || `Page ${index + 1}`;
+          const tags = getPageStatusTags(page)
+            .map((tag) => `<span>${tag}</span>`)
+            .join("");
+          button.innerHTML = `<div>${name}</div><div class="page-meta">${tags}</div>`;
+          button.addEventListener("click", () => setCurrentPage(index));
+          if (index === currentPageIndex) {
+            button.classList.add("active");
+          }
+          pageList.appendChild(button);
+        });
+      };
+
       const renderBubbleList = () => {
         bubbleList.innerHTML = "";
+        const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) {
           bubbleList.innerHTML =
             '<div class="placeholder" style="padding: 12px;">No bubbles loaded.</div>';
@@ -424,6 +517,7 @@
 
       const renderOverlays = () => {
         clearOverlays();
+        const jsonData = getCurrentJson();
         if (!jsonData || !mainImage.src) return;
 
         const displayedWidth = mainImage.clientWidth;
@@ -456,6 +550,7 @@
       };
 
       const selectBubble = (index) => {
+        const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
         const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
         selectedIndex = clamped;
@@ -472,79 +567,182 @@
       };
 
       bubbleText.addEventListener("input", (event) => {
+        const jsonData = getCurrentJson();
         if (selectedIndex < 0 || !jsonData) return;
         jsonData.items[selectedIndex].text = event.target.value;
       });
 
       bubbleType.addEventListener("change", (event) => {
+        const jsonData = getCurrentJson();
         if (selectedIndex < 0 || !jsonData) return;
         jsonData.items[selectedIndex].bubble_type = event.target.value;
       });
 
-      imageInput.addEventListener("change", (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (loadEvent) => {
-          mainImage.src = loadEvent.target.result;
-          loadedImageName = file.name;
+      const setCurrentPage = (index) => {
+        if (index < 0 || index >= pages.length) return;
+        currentPageIndex = index;
+        const page = getCurrentPage();
+        if (page?.imageUrl) {
+          mainImage.src = page.imageUrl;
           imagePlaceholder.style.display = "none";
-          mainImage.onload = () => {
-            renderOverlays();
-          };
-          updateStatus();
+          mainImage.style.display = "block";
+        } else {
+          mainImage.removeAttribute("src");
+          imagePlaceholder.style.display = "block";
+          mainImage.style.display = "none";
+        }
+        mainImage.onload = () => {
+          renderOverlays();
         };
-        reader.readAsDataURL(file);
+        resetSelection();
+        renderPageList();
+        renderBubbleList();
+        renderOverlays();
+        updateStatus();
+      };
+
+      const findPageByBaseName = (baseName) =>
+        pages.find((page) => page.baseName === baseName);
+
+      imageInput.addEventListener("change", (event) => {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+        files.forEach((file, index) => {
+          const baseName = getBaseName(file.name);
+          const existing = findPageByBaseName(baseName);
+          const imageUrl = URL.createObjectURL(file);
+          if (existing) {
+            existing.imageFile = file;
+            existing.imageUrl = imageUrl;
+            existing.imageName = file.name;
+          } else {
+            pages.push({
+              id: crypto.randomUUID(),
+              baseName,
+              imageFile: file,
+              imageUrl,
+              imageName: file.name,
+              jsonData: null,
+              jsonName: "",
+            });
+          }
+          if (currentPageIndex === -1 && index === 0) {
+            currentPageIndex = 0;
+          }
+        });
+        setError("");
+        renderPageList();
+        if (currentPageIndex === -1 && pages.length) {
+          setCurrentPage(0);
+        } else if (currentPageIndex >= 0) {
+          setCurrentPage(currentPageIndex);
+        }
+        updateStatus();
       });
 
       jsonInput.addEventListener("change", (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (loadEvent) => {
-          try {
-            const data = JSON.parse(loadEvent.target.result);
-            const error = validateJsonStructure(data);
-            if (error) {
-              setError(error);
-              jsonData = null;
-              resetSelection();
-              renderBubbleList();
-              renderOverlays();
-              updateStatus();
-              return;
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+        let errorMessage = "";
+        const readers = files.map(
+          (file) =>
+            new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve({ file, content: reader.result });
+              reader.readAsText(file);
+            }),
+        );
+        Promise.all(readers).then((results) => {
+          results.forEach(({ file, content }) => {
+            try {
+              const data = JSON.parse(content);
+              const error = validateJsonStructure(data);
+              if (error) {
+                errorMessage = errorMessage
+                  ? `${errorMessage} ${file.name}: ${error}`
+                  : `${file.name}: ${error}`;
+                return;
+              }
+              data.items.forEach((item) => normalizeItem(item));
+              const baseName = getBaseName(file.name);
+              const existing = findPageByBaseName(baseName);
+              if (existing) {
+                existing.jsonData = data;
+                existing.jsonName = file.name;
+              } else {
+                pages.push({
+                  id: crypto.randomUUID(),
+                  baseName,
+                  imageFile: null,
+                  imageUrl: "",
+                  imageName: "",
+                  jsonData: data,
+                  jsonName: file.name,
+                });
+              }
+            } catch (err) {
+              errorMessage = errorMessage
+                ? `${errorMessage} ${file.name}: Invalid JSON file.`
+                : `${file.name}: Invalid JSON file.`;
             }
-            data.items.forEach((item) => normalizeItem(item));
-            jsonData = data;
-            loadedJsonName = file.name;
-            setError("");
-            resetSelection();
-            renderBubbleList();
-            renderOverlays();
-            updateStatus();
-          } catch (err) {
-            setError("Invalid JSON file.");
+          });
+          setError(errorMessage);
+          renderPageList();
+          if (currentPageIndex === -1 && pages.length) {
+            setCurrentPage(0);
+          } else if (currentPageIndex >= 0) {
+            setCurrentPage(currentPageIndex);
           }
-        };
-        reader.readAsText(file);
+          updateStatus();
+        });
       });
 
+      const getDownloadName = (page) => {
+        if (page.jsonName) {
+          return page.jsonName;
+        }
+        if (page.imageName) {
+          return `${getBaseName(page.imageName)}.json`;
+        }
+        return "translated-bubbles.json";
+      };
+
       const downloadJson = () => {
-        if (!jsonData) return;
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        const jsonData = page.jsonData;
         const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
           type: "application/json",
         });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = "translated-bubbles.json";
+        link.download = getDownloadName(page);
         document.body.appendChild(link);
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
       };
 
+      const downloadAllJson = () => {
+        pages.forEach((page) => {
+          if (!page.jsonData) return;
+          const blob = new Blob([JSON.stringify(page.jsonData, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = getDownloadName(page);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        });
+      };
+
       downloadBtn.addEventListener("click", downloadJson);
+      downloadAllBtn.addEventListener("click", downloadAllJson);
 
       window.addEventListener("resize", () => {
         renderOverlays();
@@ -559,6 +757,7 @@
           downloadJson();
           return;
         }
+        const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
         if (event.key === "ArrowDown") {
           event.preventDefault();
@@ -573,6 +772,7 @@
       // How to run locally:
       // 1) Save this file as index.html.
       // 2) Open index.html in your browser.
+      renderPageList();
       updateStatus();
     </script>
   </body>
