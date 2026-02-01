@@ -393,8 +393,18 @@
       </section>
 
       <section class="image-panel">
-        <div class="panel image-wrapper" id="imageWrapper">
-          <div class="image-toolbar" aria-label="Image tools">
+        <div
+          class="panel image-wrapper"
+          id="imageWrapper"
+          onselectstart="return false;"
+          draggable="false"
+        >
+          <div
+            class="image-toolbar"
+            aria-label="Image tools"
+            onselectstart="return false;"
+            draggable="false"
+          >
             <button type="button" id="zoomOutBtn" title="Zoom out">-</button>
             <button type="button" id="zoomInBtn" title="Zoom in">+</button>
             <button type="button" id="zoomResetBtn" title="Reset zoom">
@@ -590,12 +600,10 @@
       };
 
       const getPanLimitX = () =>
-        getMaxPanX() +
-        Math.max(PAN_MARGIN, imageWrapper.clientWidth / 2);
+        getMaxPanX() + Math.max(PAN_MARGIN, imageWrapper.clientWidth / 2);
 
       const getPanLimitY = () =>
-        getMaxPanY() +
-        Math.max(PAN_MARGIN, imageWrapper.clientHeight / 2);
+        getMaxPanY() + Math.max(PAN_MARGIN, imageWrapper.clientHeight / 2);
 
       const clampPanX = (value) => {
         const limit = getPanLimitX();
