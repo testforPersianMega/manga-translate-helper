@@ -188,6 +188,53 @@
         justify-content: center;
       }
 
+      .image-toolbar {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.75);
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        backdrop-filter: blur(6px);
+        z-index: 3;
+      }
+
+      .image-toolbar button {
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        background: rgba(30, 41, 59, 0.9);
+        color: #f8fafc;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .image-toolbar button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .zoom-label {
+        display: inline-flex;
+        align-items: center;
+        padding: 0 8px;
+        font-size: 12px;
+        color: #e2e8f0;
+        border-radius: 8px;
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+
+      .image-stage {
+        position: relative;
+        display: inline-flex;
+        transform-origin: center;
+        transition: transform 0.15s ease;
+      }
+
       .image-wrapper img {
         max-width: 100%;
         height: auto;
@@ -196,6 +243,8 @@
 
       .overlay-layer {
         position: absolute;
+        top: 0;
+        left: 0;
         pointer-events: none;
       }
 
@@ -316,11 +365,21 @@
 
       <section class="image-panel">
         <div class="panel image-wrapper" id="imageWrapper">
+          <div class="image-toolbar" aria-label="Image tools">
+            <button type="button" id="zoomOutBtn" title="Zoom out">-</button>
+            <button type="button" id="zoomInBtn" title="Zoom in">+</button>
+            <button type="button" id="zoomResetBtn" title="Reset zoom">
+              Reset
+            </button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
+          </div>
           <div class="placeholder" id="imagePlaceholder">
             Upload an image to begin.
           </div>
-          <img id="mainImage" alt="Uploaded preview" />
-          <div class="overlay-layer" id="overlayLayer"></div>
+          <div class="image-stage" id="imageStage">
+            <img id="mainImage" alt="Uploaded preview" />
+            <div class="overlay-layer" id="overlayLayer"></div>
+          </div>
         </div>
         <div class="error" id="errorText"></div>
       </section>
@@ -369,6 +428,7 @@
       const mainImage = document.getElementById("mainImage");
       const imageWrapper = document.getElementById("imageWrapper");
       const imagePlaceholder = document.getElementById("imagePlaceholder");
+      const imageStage = document.getElementById("imageStage");
       const overlayLayer = document.getElementById("overlayLayer");
       const pageList = document.getElementById("pageList");
       const bubbleList = document.getElementById("bubbleList");
@@ -378,6 +438,10 @@
       const bubbleOriginal = document.getElementById("bubbleOriginal");
       const bubbleText = document.getElementById("bubbleText");
       const bubbleType = document.getElementById("bubbleType");
+      const zoomOutBtn = document.getElementById("zoomOutBtn");
+      const zoomInBtn = document.getElementById("zoomInBtn");
+      const zoomResetBtn = document.getElementById("zoomResetBtn");
+      const zoomLabel = document.getElementById("zoomLabel");
 
       const bubbleTypeOptions = Array.from(bubbleType.options).map(
         (option) => option.value,
@@ -386,6 +450,11 @@
       const pages = [];
       let currentPageIndex = -1;
       let selectedIndex = -1;
+      let zoomLevel = 1;
+
+      const MIN_ZOOM = 0.4;
+      const MAX_ZOOM = 3;
+      const ZOOM_STEP = 0.2;
 
       const getBaseName = (filename) =>
         filename.replace(/\.[^/.]+$/, "");
@@ -429,6 +498,15 @@
 
       const setError = (message) => {
         errorText.textContent = message || "";
+      };
+
+      const applyZoom = (level) => {
+        zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, level));
+        imageStage.style.transform = `scale(${zoomLevel})`;
+        zoomLabel.textContent = `${Math.round(zoomLevel * 100)}%`;
+        zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM + 0.001;
+        zoomInBtn.disabled = zoomLevel >= MAX_ZOOM - 0.001;
+        zoomResetBtn.disabled = Math.abs(zoomLevel - 1) < 0.001;
       };
 
       const resetSelection = () => {
@@ -585,15 +663,18 @@
         if (page?.imageUrl) {
           mainImage.src = page.imageUrl;
           imagePlaceholder.style.display = "none";
+          imageStage.style.display = "inline-flex";
           mainImage.style.display = "block";
         } else {
           mainImage.removeAttribute("src");
           imagePlaceholder.style.display = "block";
+          imageStage.style.display = "none";
           mainImage.style.display = "none";
         }
         mainImage.onload = () => {
           renderOverlays();
         };
+        applyZoom(1);
         resetSelection();
         renderPageList();
         renderBubbleList();
@@ -744,6 +825,18 @@
       downloadBtn.addEventListener("click", downloadJson);
       downloadAllBtn.addEventListener("click", downloadAllJson);
 
+      zoomOutBtn.addEventListener("click", () => {
+        applyZoom(zoomLevel - ZOOM_STEP);
+      });
+
+      zoomInBtn.addEventListener("click", () => {
+        applyZoom(zoomLevel + ZOOM_STEP);
+      });
+
+      zoomResetBtn.addEventListener("click", () => {
+        applyZoom(1);
+      });
+
       window.addEventListener("resize", () => {
         renderOverlays();
       });
@@ -773,6 +866,7 @@
       // 1) Save this file as index.html.
       // 2) Open index.html in your browser.
       renderPageList();
+      applyZoom(1);
       updateStatus();
     </script>
   </body>
