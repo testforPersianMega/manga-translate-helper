@@ -328,16 +328,40 @@
         cursor: nesw-resize;
       }
 
+      .bubble-handle[data-corner="n"] {
+        top: 0;
+        left: 50%;
+        cursor: ns-resize;
+      }
+
       .bubble-handle[data-corner="sw"] {
         top: 100%;
         left: 0;
         cursor: nesw-resize;
       }
 
+      .bubble-handle[data-corner="w"] {
+        top: 50%;
+        left: 0;
+        cursor: ew-resize;
+      }
+
       .bubble-handle[data-corner="se"] {
         top: 100%;
         left: 100%;
         cursor: nwse-resize;
+      }
+
+      .bubble-handle[data-corner="e"] {
+        top: 50%;
+        left: 100%;
+        cursor: ew-resize;
+      }
+
+      .bubble-handle[data-corner="s"] {
+        top: 100%;
+        left: 50%;
+        cursor: ns-resize;
       }
 
       .right-panel h2 {
@@ -843,7 +867,7 @@
           overlay.addEventListener("click", () => selectBubble(index));
           if (index === selectedIndex) {
             overlay.classList.add("active");
-            ["nw", "ne", "sw", "se"].forEach((corner) => {
+            ["nw", "n", "ne", "e", "se", "s", "sw", "w"].forEach((corner) => {
               const handle = document.createElement("div");
               handle.className = "bubble-handle";
               handle.dataset.corner = corner;
@@ -1163,28 +1187,44 @@
         const deltaX = coords.x - pointer.x;
         const deltaY = coords.y - pointer.y;
         let next = { ...bbox };
-        if (resizeCorner === "nw" || resizeCorner === "sw") {
+        if (
+          resizeCorner === "nw" ||
+          resizeCorner === "sw" ||
+          resizeCorner === "w"
+        ) {
           next.x_min = clamp(
             bbox.x_min + deltaX,
             bounds.minX,
             bbox.x_max - MIN_BBOX_SIZE,
           );
         }
-        if (resizeCorner === "ne" || resizeCorner === "se") {
+        if (
+          resizeCorner === "ne" ||
+          resizeCorner === "se" ||
+          resizeCorner === "e"
+        ) {
           next.x_max = clamp(
             bbox.x_max + deltaX,
             bbox.x_min + MIN_BBOX_SIZE,
             bounds.maxX,
           );
         }
-        if (resizeCorner === "nw" || resizeCorner === "ne") {
+        if (
+          resizeCorner === "nw" ||
+          resizeCorner === "ne" ||
+          resizeCorner === "n"
+        ) {
           next.y_min = clamp(
             bbox.y_min + deltaY,
             bounds.minY,
             bbox.y_max - MIN_BBOX_SIZE,
           );
         }
-        if (resizeCorner === "sw" || resizeCorner === "se") {
+        if (
+          resizeCorner === "sw" ||
+          resizeCorner === "se" ||
+          resizeCorner === "s"
+        ) {
           next.y_max = clamp(
             bbox.y_max + deltaY,
             bbox.y_min + MIN_BBOX_SIZE,
