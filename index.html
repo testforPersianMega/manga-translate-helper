@@ -437,7 +437,7 @@
         const heightScale = displayedHeight / jsonData.image_size.height;
 
         jsonData.items.forEach((item, index) => {
-          const bbox = item.bbox_bubble;
+          const bbox = item.bbox_bubble ?? item.bbox_text;
           if (!bbox) return;
           const left = bbox.x_min * widthScale;
           const top = bbox.y_min * heightScale;
