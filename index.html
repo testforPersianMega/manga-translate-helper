@@ -188,6 +188,14 @@
         justify-content: center;
       }
 
+      .image-wrapper.grabbable {
+        cursor: grab;
+      }
+
+      .image-wrapper.grabbing {
+        cursor: grabbing;
+      }
+
       .image-toolbar {
         position: absolute;
         top: 12px;
@@ -451,10 +459,15 @@
       let currentPageIndex = -1;
       let selectedIndex = -1;
       let zoomLevel = 1;
+      let panX = 0;
+      let isDragging = false;
+      let dragStartX = 0;
+      let panStartX = 0;
 
       const MIN_ZOOM = 0.4;
       const MAX_ZOOM = 3;
       const ZOOM_STEP = 0.2;
+      const PAN_STEP = 80;
 
       const getBaseName = (filename) =>
         filename.replace(/\.[^/.]+$/, "");
@@ -500,13 +513,44 @@
         errorText.textContent = message || "";
       };
 
+      const getMaxPan = () => {
+        const wrapperWidth = imageWrapper.clientWidth;
+        const imageWidth = mainImage.clientWidth;
+        if (!wrapperWidth || !imageWidth) return 0;
+        const scaledWidth = imageWidth * zoomLevel;
+        return Math.max(0, (scaledWidth - wrapperWidth) / 2);
+      };
+
+      const clampPan = (value) => {
+        const maxPan = getMaxPan();
+        return Math.min(maxPan, Math.max(-maxPan, value));
+      };
+
+      const updateTransform = () => {
+        imageStage.style.transform = `translateX(${panX / zoomLevel}px) scale(${zoomLevel})`;
+      };
+
+      const updateGrabState = () => {
+        const canPan = getMaxPan() > 0.5;
+        imageWrapper.classList.toggle("grabbable", canPan);
+        if (!canPan) {
+          panX = 0;
+          updateTransform();
+        } else {
+          panX = clampPan(panX);
+          updateTransform();
+        }
+      };
+
       const applyZoom = (level) => {
         zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, level));
-        imageStage.style.transform = `scale(${zoomLevel})`;
+        panX = clampPan(panX);
+        updateTransform();
         zoomLabel.textContent = `${Math.round(zoomLevel * 100)}%`;
         zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM + 0.001;
         zoomInBtn.disabled = zoomLevel >= MAX_ZOOM - 0.001;
         zoomResetBtn.disabled = Math.abs(zoomLevel - 1) < 0.001;
+        updateGrabState();
       };
 
       const resetSelection = () => {
@@ -673,7 +717,9 @@
         }
         mainImage.onload = () => {
           renderOverlays();
+          updateGrabState();
         };
+        panX = 0;
         applyZoom(1);
         resetSelection();
         renderPageList();
@@ -839,9 +885,53 @@
 
       window.addEventListener("resize", () => {
         renderOverlays();
+        updateGrabState();
       });
 
+      imageWrapper.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        if (event.target.closest(".bubble-overlay")) return;
+        if (getMaxPan() <= 0.5) return;
+        isDragging = true;
+        dragStartX = event.clientX;
+        panStartX = panX;
+        imageWrapper.classList.add("grabbing");
+        imageWrapper.setPointerCapture(event.pointerId);
+      });
+
+      imageWrapper.addEventListener("pointermove", (event) => {
+        if (!isDragging) return;
+        const delta = event.clientX - dragStartX;
+        panX = clampPan(panStartX + delta);
+        updateTransform();
+      });
+
+      const stopDragging = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        imageWrapper.classList.remove("grabbing");
+      };
+
+      imageWrapper.addEventListener("pointerup", stopDragging);
+      imageWrapper.addEventListener("pointercancel", stopDragging);
+      imageWrapper.addEventListener("pointerleave", stopDragging);
+
+      const panBy = (delta) => {
+        if (getMaxPan() <= 0.5) return;
+        panX = clampPan(panX + delta);
+        updateTransform();
+      };
+
+      const isTypingTarget = (eventTarget) => {
+        if (!(eventTarget instanceof Element)) return false;
+        return (
+          eventTarget.closest("input, textarea, select, [contenteditable='true']") !==
+          null
+        );
+      };
+
       document.addEventListener("keydown", (event) => {
+        if (isTypingTarget(event.target)) return;
         if (
           (event.ctrlKey || event.metaKey) &&
           event.key.toLowerCase() === "s"
@@ -849,6 +939,34 @@
           event.preventDefault();
           downloadJson();
           return;
+        }
+        if (!event.ctrlKey && !event.metaKey) {
+          if (event.key === "+" || event.key === "=") {
+            event.preventDefault();
+            applyZoom(zoomLevel + ZOOM_STEP);
+            return;
+          }
+          if (event.key === "-") {
+            event.preventDefault();
+            applyZoom(zoomLevel - ZOOM_STEP);
+            return;
+          }
+          if (event.key === "0") {
+            event.preventDefault();
+            panX = 0;
+            applyZoom(1);
+            return;
+          }
+          if (event.shiftKey && event.key === "ArrowLeft") {
+            event.preventDefault();
+            panBy(-PAN_STEP);
+            return;
+          }
+          if (event.shiftKey && event.key === "ArrowRight") {
+            event.preventDefault();
+            panBy(PAN_STEP);
+            return;
+          }
         }
         const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
