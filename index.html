@@ -1096,11 +1096,11 @@
         const scale = getOverlayScale();
         if (!scale) return null;
         const rect = overlayLayer.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
+        const localX = (event.clientX - rect.left) / zoomLevel;
+        const localY = (event.clientY - rect.top) / zoomLevel;
         return {
-          x: x / scale.widthScale,
-          y: y / scale.heightScale,
+          x: localX / scale.widthScale,
+          y: localY / scale.heightScale,
         };
       };
 
