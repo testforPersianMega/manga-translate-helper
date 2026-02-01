@@ -290,6 +290,41 @@
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
       }
 
+      .bubble-handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: #fff;
+        border: 2px solid var(--accent);
+        border-radius: 4px;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+      }
+
+      .bubble-handle[data-corner="nw"] {
+        top: 0;
+        left: 0;
+        cursor: nwse-resize;
+      }
+
+      .bubble-handle[data-corner="ne"] {
+        top: 0;
+        left: 100%;
+        cursor: nesw-resize;
+      }
+
+      .bubble-handle[data-corner="sw"] {
+        top: 100%;
+        left: 0;
+        cursor: nesw-resize;
+      }
+
+      .bubble-handle[data-corner="se"] {
+        top: 100%;
+        left: 100%;
+        cursor: nwse-resize;
+      }
+
       .right-panel h2 {
         margin-top: 0;
         font-size: 18px;
@@ -421,6 +456,16 @@
               aria-label="Zoom level"
             />
             <span class="zoom-label" id="zoomLabel">100%</span>
+            <button type="button" id="addBubbleBtn" title="Add bubble">
+              Add Bubble
+            </button>
+            <button
+              type="button"
+              id="removeBubbleBtn"
+              title="Remove selected bubble"
+            >
+              Remove Bubble
+            </button>
           </div>
           <div class="placeholder" id="imagePlaceholder">
             Upload an image to begin.
@@ -502,6 +547,8 @@
       const zoomResetBtn = document.getElementById("zoomResetBtn");
       const zoomLabel = document.getElementById("zoomLabel");
       const zoomRange = document.getElementById("zoomRange");
+      const addBubbleBtn = document.getElementById("addBubbleBtn");
+      const removeBubbleBtn = document.getElementById("removeBubbleBtn");
 
       const bubbleTypeOptions = Array.from(bubbleType.options).map(
         (option) => option.value,
@@ -521,6 +568,11 @@
       let activePointerId = null;
       let panRaf = 0;
       let pendingPan = null;
+      let isResizing = false;
+      let resizeCorner = null;
+      let resizeStart = null;
+      let resizePointerId = null;
+      let resizeTarget = null;
       const logDragEvent = (message, event, details = {}) => {
         console.info(`[drag] ${message}`, {
           pointerId: event?.pointerId ?? null,
@@ -539,6 +591,7 @@
       const ZOOM_STEP = 0.2;
       const PAN_STEP = 80;
       const PAN_MARGIN = 120;
+      const MIN_BBOX_SIZE = 12;
 
       const getBaseName = (filename) => filename.replace(/\.[^/.]+$/, "");
 
@@ -577,6 +630,12 @@
           : "No image or JSON loaded.";
         downloadBtn.disabled = !getCurrentJson();
         downloadAllBtn.disabled = !pages.some((page) => page.jsonData);
+      };
+
+      const updateBubbleToolState = () => {
+        const hasJson = Boolean(getCurrentJson());
+        addBubbleBtn.disabled = !hasJson;
+        removeBubbleBtn.disabled = !hasJson || selectedIndex < 0;
       };
 
       const setError = (message) => {
@@ -654,6 +713,7 @@
         bubbleOriginal.value = "";
         bubbleText.value = "";
         bubbleType.value = "Standard";
+        updateBubbleToolState();
       };
 
       const clearOverlays = () => {
@@ -756,9 +816,19 @@
           overlay.style.top = `${top}px`;
           overlay.style.width = `${width}px`;
           overlay.style.height = `${height}px`;
+          overlay.dataset.index = String(index);
           overlay.addEventListener("click", () => selectBubble(index));
           if (index === selectedIndex) {
             overlay.classList.add("active");
+            ["nw", "ne", "sw", "se"].forEach((corner) => {
+              const handle = document.createElement("div");
+              handle.className = "bubble-handle";
+              handle.dataset.corner = corner;
+              handle.addEventListener("pointerdown", (event) =>
+                startResize(event, index, corner),
+              );
+              overlay.appendChild(handle);
+            });
           }
           overlayLayer.appendChild(overlay);
         });
@@ -779,6 +849,7 @@
         detailForm.hidden = false;
         renderBubbleList();
         renderOverlays();
+        updateBubbleToolState();
       };
 
       bubbleText.addEventListener("input", (event) => {
@@ -820,6 +891,7 @@
         renderBubbleList();
         renderOverlays();
         updateStatus();
+        updateBubbleToolState();
       };
 
       const findPageByBaseName = (baseName) =>
@@ -984,6 +1056,127 @@
         applyZoom(value);
       });
 
+      const getOverlayScale = () => {
+        const jsonData = getCurrentJson();
+        if (!jsonData) return null;
+        const displayedWidth = mainImage.clientWidth;
+        const displayedHeight = mainImage.clientHeight;
+        if (!displayedWidth || !displayedHeight) return null;
+        return {
+          widthScale: displayedWidth / jsonData.image_size.width,
+          heightScale: displayedHeight / jsonData.image_size.height,
+        };
+      };
+
+      const getPointerImageCoords = (event) => {
+        const scale = getOverlayScale();
+        if (!scale) return null;
+        const rect = overlayLayer.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        return {
+          x: x / scale.widthScale,
+          y: y / scale.heightScale,
+        };
+      };
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const getItemBbox = (item) =>
+        item.bbox_bubble ?? item.bbox_text ?? null;
+
+      const setItemBbox = (item, bbox) => {
+        item.bbox_bubble = { ...bbox };
+      };
+
+      const getResizeBounds = (jsonData) => ({
+        minX: 0,
+        minY: 0,
+        maxX: jsonData.image_size.width,
+        maxY: jsonData.image_size.height,
+      });
+
+      const startResize = (event, index, corner) => {
+        const jsonData = getCurrentJson();
+        if (!jsonData) return;
+        const item = jsonData.items[index];
+        const bbox = getItemBbox(item);
+        if (!bbox) return;
+        const coords = getPointerImageCoords(event);
+        if (!coords) return;
+        event.stopPropagation();
+        isResizing = true;
+        resizeCorner = corner;
+        resizeStart = {
+          pointer: coords,
+          bbox: { ...bbox },
+          bounds: getResizeBounds(jsonData),
+        };
+        resizePointerId = event.pointerId;
+        resizeTarget = event.currentTarget;
+        resizeTarget.setPointerCapture(event.pointerId);
+      };
+
+      const applyResize = (event) => {
+        if (!isResizing || !resizeStart || resizePointerId === null) return;
+        const jsonData = getCurrentJson();
+        if (!jsonData) return;
+        const item = jsonData.items[selectedIndex];
+        if (!item) return;
+        const coords = getPointerImageCoords(event);
+        if (!coords) return;
+        const { bbox, pointer, bounds } = resizeStart;
+        const deltaX = coords.x - pointer.x;
+        const deltaY = coords.y - pointer.y;
+        let next = { ...bbox };
+        if (resizeCorner === "nw" || resizeCorner === "sw") {
+          next.x_min = clamp(
+            bbox.x_min + deltaX,
+            bounds.minX,
+            bbox.x_max - MIN_BBOX_SIZE,
+          );
+        }
+        if (resizeCorner === "ne" || resizeCorner === "se") {
+          next.x_max = clamp(
+            bbox.x_max + deltaX,
+            bbox.x_min + MIN_BBOX_SIZE,
+            bounds.maxX,
+          );
+        }
+        if (resizeCorner === "nw" || resizeCorner === "ne") {
+          next.y_min = clamp(
+            bbox.y_min + deltaY,
+            bounds.minY,
+            bbox.y_max - MIN_BBOX_SIZE,
+          );
+        }
+        if (resizeCorner === "sw" || resizeCorner === "se") {
+          next.y_max = clamp(
+            bbox.y_max + deltaY,
+            bbox.y_min + MIN_BBOX_SIZE,
+            bounds.maxY,
+          );
+        }
+        setItemBbox(item, next);
+        renderOverlays();
+      };
+
+      const stopResize = (event) => {
+        if (!isResizing) return;
+        if (resizeTarget && resizePointerId !== null) {
+          try {
+            resizeTarget.releasePointerCapture(resizePointerId);
+          } catch (error) {
+            // Ignore release errors.
+          }
+        }
+        isResizing = false;
+        resizeCorner = null;
+        resizeStart = null;
+        resizePointerId = null;
+        resizeTarget = null;
+      };
+
       window.addEventListener("resize", () => {
         renderOverlays();
         updateGrabState();
@@ -1016,6 +1209,7 @@
         if (event.button !== 0) return;
         if (event.target.closest(".image-toolbar")) return;
         if (event.target.closest(".bubble-overlay")) return;
+        if (event.target.closest(".bubble-handle")) return;
         if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
         isDragging = true;
         activePointerId = event.pointerId;
@@ -1057,6 +1251,21 @@
         const deltaX = event.clientX - dragStartX;
         const deltaY = event.clientY - dragStartY;
         schedulePanUpdate(panStartX + deltaX, panStartY + deltaY);
+      });
+
+      window.addEventListener("pointermove", (event) => {
+        if (!isResizing) return;
+        applyResize(event);
+      });
+
+      window.addEventListener("pointerup", (event) => {
+        if (!isResizing) return;
+        stopResize(event);
+      });
+
+      window.addEventListener("pointercancel", (event) => {
+        if (!isResizing) return;
+        stopResize(event);
       });
 
       const finalizePan = (event) => {
@@ -1197,12 +1406,58 @@
         }
       });
 
+      const createDefaultBubble = (jsonData) => {
+        const width = jsonData.image_size.width;
+        const height = jsonData.image_size.height;
+        const boxWidth = Math.max(120, width * 0.18);
+        const boxHeight = Math.max(80, height * 0.12);
+        const xMin = Math.max(0, width / 2 - boxWidth / 2);
+        const yMin = Math.max(0, height / 2 - boxHeight / 2);
+        return {
+          id: (jsonData.items.at(-1)?.id ?? jsonData.items.length) + 1,
+          text_original: "",
+          text: "",
+          bubble_type: "Standard",
+          bbox_bubble: {
+            x_min: xMin,
+            y_min: yMin,
+            x_max: Math.min(width, xMin + boxWidth),
+            y_max: Math.min(height, yMin + boxHeight),
+          },
+        };
+      };
+
+      addBubbleBtn.addEventListener("click", () => {
+        const jsonData = getCurrentJson();
+        if (!jsonData) return;
+        const newItem = createDefaultBubble(jsonData);
+        jsonData.items.push(newItem);
+        selectBubble(jsonData.items.length - 1);
+        updateStatus();
+      });
+
+      removeBubbleBtn.addEventListener("click", () => {
+        const jsonData = getCurrentJson();
+        if (!jsonData || selectedIndex < 0) return;
+        jsonData.items.splice(selectedIndex, 1);
+        if (jsonData.items.length) {
+          selectBubble(Math.min(selectedIndex, jsonData.items.length - 1));
+        } else {
+          resetSelection();
+          renderBubbleList();
+          renderOverlays();
+        }
+        updateStatus();
+        updateBubbleToolState();
+      });
+
       // How to run locally:
       // 1) Save this file as index.html.
       // 2) Open index.html in your browser.
       renderPageList();
       applyZoom(1);
       updateStatus();
+      updateBubbleToolState();
     </script>
   </body>
 </html>
