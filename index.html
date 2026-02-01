@@ -589,9 +589,13 @@
         return Math.max(0, (scaledHeight - wrapperHeight) / 2);
       };
 
-      const getPanLimitX = () => getMaxPanX() + PAN_MARGIN;
+      const getPanLimitX = () =>
+        getMaxPanX() +
+        Math.max(PAN_MARGIN, imageWrapper.clientWidth / 2);
 
-      const getPanLimitY = () => getMaxPanY() + PAN_MARGIN;
+      const getPanLimitY = () =>
+        getMaxPanY() +
+        Math.max(PAN_MARGIN, imageWrapper.clientHeight / 2);
 
       const clampPanX = (value) => {
         const limit = getPanLimitX();
@@ -604,7 +608,7 @@
       };
 
       const updateTransform = () => {
-        imageStage.style.transform = `translate(${panX / zoomLevel}px, ${panY / zoomLevel}px) scale(${zoomLevel})`;
+        imageStage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
       };
 
       const updateGrabState = () => {
