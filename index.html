@@ -919,6 +919,7 @@
 
       imageWrapper.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
+        if (event.target.closest(".image-toolbar")) return;
         if (event.target.closest(".bubble-overlay")) return;
         if (getMaxPanX() <= 0.5 && getMaxPanY() <= 0.5) return;
         isDragging = true;
