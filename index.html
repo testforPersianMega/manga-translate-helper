@@ -196,6 +196,10 @@
         cursor: grabbing;
       }
 
+      .image-wrapper.drawing {
+        cursor: crosshair;
+      }
+
       .image-toolbar {
         position: absolute;
         top: 12px;
@@ -225,6 +229,12 @@
       .image-toolbar button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+
+      .image-toolbar button.is-active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
       }
 
       .zoom-label {
@@ -288,6 +298,11 @@
         border-color: var(--accent);
         background: rgba(59, 130, 246, 0.28);
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+
+      .bubble-overlay.drawing {
+        border-style: dashed;
+        background: rgba(59, 130, 246, 0.18);
       }
 
       .bubble-handle {
@@ -573,6 +588,10 @@
       let resizeStart = null;
       let resizePointerId = null;
       let resizeTarget = null;
+      let isDrawingBubble = false;
+      let drawStart = null;
+      let drawOverlay = null;
+      let drawPointerId = null;
       const logDragEvent = (message, event, details = {}) => {
         console.info(`[drag] ${message}`, {
           pointerId: event?.pointerId ?? null,
@@ -636,6 +655,9 @@
         const hasJson = Boolean(getCurrentJson());
         addBubbleBtn.disabled = !hasJson;
         removeBubbleBtn.disabled = !hasJson || selectedIndex < 0;
+        if (!hasJson && isDrawingBubble) {
+          setDrawingMode(false);
+        }
       };
 
       const setError = (message) => {
@@ -714,6 +736,7 @@
         bubbleText.value = "";
         bubbleType.value = "Standard";
         updateBubbleToolState();
+        setDrawingMode(false);
       };
 
       const clearOverlays = () => {
@@ -867,6 +890,7 @@
       const setCurrentPage = (index) => {
         if (index < 0 || index >= pages.length) return;
         currentPageIndex = index;
+        setDrawingMode(false);
         const page = getCurrentPage();
         if (page?.imageUrl) {
           mainImage.src = page.imageUrl;
@@ -1177,6 +1201,113 @@
         resizeTarget = null;
       };
 
+      function setDrawingMode(active) {
+        isDrawingBubble = active;
+        imageWrapper.classList.toggle("drawing", active);
+        addBubbleBtn.classList.toggle("is-active", active);
+        if (!active) {
+          cancelDrawBubble();
+        }
+      }
+
+      function cancelDrawBubble() {
+        if (drawOverlay) {
+          drawOverlay.remove();
+          drawOverlay = null;
+        }
+        drawStart = null;
+        if (drawPointerId !== null) {
+          try {
+            imageWrapper.releasePointerCapture(drawPointerId);
+          } catch (error) {
+            // Ignore release errors.
+          }
+        }
+        drawPointerId = null;
+      }
+
+      function updateDrawOverlay(start, current) {
+        if (!drawOverlay) return;
+        const jsonData = getCurrentJson();
+        if (!jsonData) return;
+        const width = jsonData.image_size.width;
+        const height = jsonData.image_size.height;
+        const xMin = clamp(Math.min(start.x, current.x), 0, width);
+        const xMax = clamp(Math.max(start.x, current.x), 0, width);
+        const yMin = clamp(Math.min(start.y, current.y), 0, height);
+        const yMax = clamp(Math.max(start.y, current.y), 0, height);
+        const scale = getOverlayScale();
+        if (!scale) return;
+        drawOverlay.style.left = `${xMin * scale.widthScale}px`;
+        drawOverlay.style.top = `${yMin * scale.heightScale}px`;
+        drawOverlay.style.width = `${Math.max(1, xMax - xMin) * scale.widthScale}px`;
+        drawOverlay.style.height = `${Math.max(1, yMax - yMin) * scale.heightScale}px`;
+      }
+
+      function normalizeDrawBounds(start, end, bounds) {
+        let xMin = clamp(Math.min(start.x, end.x), bounds.minX, bounds.maxX);
+        let xMax = clamp(Math.max(start.x, end.x), bounds.minX, bounds.maxX);
+        let yMin = clamp(Math.min(start.y, end.y), bounds.minY, bounds.maxY);
+        let yMax = clamp(Math.max(start.y, end.y), bounds.minY, bounds.maxY);
+
+        if (xMax - xMin < MIN_BBOX_SIZE) {
+          const adjust = MIN_BBOX_SIZE - (xMax - xMin);
+          xMin = clamp(xMin - adjust / 2, bounds.minX, bounds.maxX);
+          xMax = clamp(xMin + MIN_BBOX_SIZE, bounds.minX, bounds.maxX);
+        }
+
+        if (yMax - yMin < MIN_BBOX_SIZE) {
+          const adjust = MIN_BBOX_SIZE - (yMax - yMin);
+          yMin = clamp(yMin - adjust / 2, bounds.minY, bounds.maxY);
+          yMax = clamp(yMin + MIN_BBOX_SIZE, bounds.minY, bounds.maxY);
+        }
+
+        return { xMin, xMax, yMin, yMax };
+      }
+
+      function startDrawBubble(event) {
+        const jsonData = getCurrentJson();
+        if (!jsonData) return;
+        const coords = getPointerImageCoords(event);
+        if (!coords) return;
+        event.preventDefault();
+        drawStart = coords;
+        if (!drawOverlay) {
+          drawOverlay = document.createElement("div");
+          drawOverlay.className = "bubble-overlay drawing";
+          overlayLayer.appendChild(drawOverlay);
+        }
+        updateDrawOverlay(drawStart, coords);
+        drawPointerId = event.pointerId;
+        imageWrapper.setPointerCapture(event.pointerId);
+      }
+
+      function finalizeDrawBubble(event) {
+        const jsonData = getCurrentJson();
+        if (!jsonData || !drawStart) return;
+        const coords = getPointerImageCoords(event);
+        if (!coords) return;
+        const bounds = getResizeBounds(jsonData);
+        const normalized = normalizeDrawBounds(drawStart, coords, bounds);
+        const newItem = {
+          id: (jsonData.items.at(-1)?.id ?? jsonData.items.length) + 1,
+          text_original: "",
+          text: "",
+          bubble_type: "Standard",
+          bbox_bubble: {
+            x_min: normalized.xMin,
+            y_min: normalized.yMin,
+            x_max: normalized.xMax,
+            y_max: normalized.yMax,
+          },
+        };
+        jsonData.items.push(newItem);
+        cancelDrawBubble();
+        setDrawingMode(false);
+        selectBubble(jsonData.items.length - 1);
+        updateStatus();
+      }
+
       window.addEventListener("resize", () => {
         renderOverlays();
         updateGrabState();
@@ -1208,6 +1339,10 @@
       imageWrapper.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
         if (event.target.closest(".image-toolbar")) return;
+        if (isDrawingBubble) {
+          startDrawBubble(event);
+          return;
+        }
         if (event.target.closest(".bubble-overlay")) return;
         if (event.target.closest(".bubble-handle")) return;
         if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
@@ -1242,6 +1377,13 @@
       };
 
       imageWrapper.addEventListener("pointermove", (event) => {
+        if (isDrawingBubble && drawStart) {
+          const coords = getPointerImageCoords(event);
+          if (coords) {
+            updateDrawOverlay(drawStart, coords);
+          }
+          return;
+        }
         if (!isDragging) return;
         if (!event.buttons) {
           logDragEvent("stop-no-buttons", event);
@@ -1311,22 +1453,40 @@
         stopDragging(event, "stop-pointer-leave");
       };
 
-      imageWrapper.addEventListener("pointerup", (event) =>
-        stopDragging(event, "stop-pointer-up"),
-      );
-      imageWrapper.addEventListener("pointercancel", (event) =>
-        stopDragging(event, "stop-pointer-cancel"),
-      );
+      imageWrapper.addEventListener("pointerup", (event) => {
+        if (isDrawingBubble && drawStart) {
+          finalizeDrawBubble(event);
+          return;
+        }
+        stopDragging(event, "stop-pointer-up");
+      });
+      imageWrapper.addEventListener("pointercancel", (event) => {
+        if (isDrawingBubble && drawStart) {
+          cancelDrawBubble();
+          setDrawingMode(false);
+          return;
+        }
+        stopDragging(event, "stop-pointer-cancel");
+      });
       imageWrapper.addEventListener("pointerleave", handlePointerLeave);
       imageWrapper.addEventListener("lostpointercapture", (event) =>
         stopDragging(event, "stop-lost-pointer-capture"),
       );
-      window.addEventListener("pointerup", (event) =>
-        stopDragging(event, "stop-window-pointer-up"),
-      );
-      window.addEventListener("pointercancel", (event) =>
-        stopDragging(event, "stop-window-pointer-cancel"),
-      );
+      window.addEventListener("pointerup", (event) => {
+        if (isDrawingBubble && drawStart) {
+          finalizeDrawBubble(event);
+          return;
+        }
+        stopDragging(event, "stop-window-pointer-up");
+      });
+      window.addEventListener("pointercancel", (event) => {
+        if (isDrawingBubble && drawStart) {
+          cancelDrawBubble();
+          setDrawingMode(false);
+          return;
+        }
+        stopDragging(event, "stop-window-pointer-cancel");
+      });
       window.addEventListener("blur", () => stopDragging(null, "stop-blur"));
 
       const panBy = (deltaX, deltaY) => {
@@ -1406,34 +1566,10 @@
         }
       });
 
-      const createDefaultBubble = (jsonData) => {
-        const width = jsonData.image_size.width;
-        const height = jsonData.image_size.height;
-        const boxWidth = Math.max(120, width * 0.18);
-        const boxHeight = Math.max(80, height * 0.12);
-        const xMin = Math.max(0, width / 2 - boxWidth / 2);
-        const yMin = Math.max(0, height / 2 - boxHeight / 2);
-        return {
-          id: (jsonData.items.at(-1)?.id ?? jsonData.items.length) + 1,
-          text_original: "",
-          text: "",
-          bubble_type: "Standard",
-          bbox_bubble: {
-            x_min: xMin,
-            y_min: yMin,
-            x_max: Math.min(width, xMin + boxWidth),
-            y_max: Math.min(height, yMin + boxHeight),
-          },
-        };
-      };
-
       addBubbleBtn.addEventListener("click", () => {
         const jsonData = getCurrentJson();
         if (!jsonData) return;
-        const newItem = createDefaultBubble(jsonData);
-        jsonData.items.push(newItem);
-        selectBubble(jsonData.items.length - 1);
-        updateStatus();
+        setDrawingMode(!isDrawingBubble);
       });
 
       removeBubbleBtn.addEventListener("click", () => {
