@@ -1,563 +1,581 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Manga Bubble Translator</title>
-  <style>
-    :root {
-      color-scheme: light;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      --bg: #f6f7fb;
-      --panel: #ffffff;
-      --border: #d6dae3;
-      --accent: #3b82f6;
-      --accent-soft: rgba(59, 130, 246, 0.2);
-      --text: #1f2937;
-      --muted: #6b7280;
-      --error: #dc2626;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    header {
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--border);
-      background: var(--panel);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-
-    .status {
-      font-size: 14px;
-      color: var(--muted);
-    }
-
-    .toolbar {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .toolbar label {
-      display: inline-flex;
-      gap: 8px;
-      align-items: center;
-      font-size: 14px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      padding: 8px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .toolbar input[type="file"] {
-      display: none;
-    }
-
-    .toolbar button {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--accent);
-      color: #fff;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
-    .toolbar button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    main {
-      display: grid;
-      grid-template-columns: 220px minmax(0, 1fr) 320px;
-      gap: 16px;
-      padding: 16px 24px 24px;
-      min-height: calc(100vh - 88px);
-    }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      overflow: hidden;
-    }
-
-    .left-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .bubble-list {
-      flex: 1;
-      overflow: auto;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-
-    .bubble-list button {
-      width: 100%;
-      text-align: left;
-      padding: 8px 12px;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      background: transparent;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
-    .bubble-list button.active {
-      background: var(--accent-soft);
-      font-weight: 600;
-    }
-
-    .image-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .image-wrapper {
-      position: relative;
-      background: #111827;
-      border-radius: 12px;
-      overflow: hidden;
-      flex: 1;
-      min-height: 320px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .image-wrapper img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    .overlay-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      pointer-events: none;
-    }
-
-    .bubble-overlay {
-      position: absolute;
-      border: 2px solid rgba(255, 255, 255, 0.7);
-      background: rgba(59, 130, 246, 0.12);
-      border-radius: 6px;
-      pointer-events: auto;
-      cursor: pointer;
-      transition: border-color 0.2s ease, background 0.2s ease;
-    }
-
-    .bubble-overlay.active {
-      border-color: var(--accent);
-      background: rgba(59, 130, 246, 0.28);
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    }
-
-    .right-panel h2 {
-      margin-top: 0;
-      font-size: 18px;
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-
-    .field label {
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .field input,
-    .field textarea,
-    .field select {
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      font-size: 14px;
-      font-family: inherit;
-    }
-
-    .field textarea {
-      min-height: 120px;
-      resize: vertical;
-    }
-
-    .placeholder {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .error {
-      color: var(--error);
-      font-size: 14px;
-    }
-
-    @media (max-width: 1100px) {
-      main {
-        grid-template-columns: 180px minmax(0, 1fr) 280px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      main {
-        grid-template-columns: 1fr;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manga Bubble Translator</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --border: #d6dae3;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.2);
+        --text: #1f2937;
+        --muted: #6b7280;
+        --error: #dc2626;
       }
 
-      .left-panel,
-      .right-panel {
-        order: 2;
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .status {
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .toolbar label {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 14px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .toolbar input[type="file"] {
+        display: none;
+      }
+
+      .toolbar button {
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .toolbar button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr) 320px;
+        gap: 16px;
+        padding: 16px 24px 24px;
+        min-height: calc(100vh - 88px);
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        overflow: hidden;
+      }
+
+      .left-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .bubble-list {
+        flex: 1;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .bubble-list button {
+        width: 100%;
+        text-align: left;
+        padding: 8px 12px;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        background: transparent;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .bubble-list button.active {
+        background: var(--accent-soft);
+        font-weight: 600;
       }
 
       .image-panel {
-        order: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
       }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <div>
-      <h1>Manga Bubble Translator</h1>
-      <div class="status" id="statusText">No image or JSON loaded.</div>
-    </div>
-    <div class="toolbar">
-      <label>
-        Upload Image
-        <input type="file" id="imageInput" accept="image/png, image/jpeg" />
-      </label>
-      <label>
-        Upload JSON
-        <input type="file" id="jsonInput" accept="application/json" />
-      </label>
-      <button id="downloadBtn" disabled>Download JSON</button>
-    </div>
-  </header>
 
-  <main>
-    <section class="panel left-panel">
-      <strong>Bubble List</strong>
-      <div class="bubble-list" id="bubbleList"></div>
-    </section>
-
-    <section class="image-panel">
-      <div class="panel image-wrapper" id="imageWrapper">
-        <div class="placeholder" id="imagePlaceholder">Upload an image to begin.</div>
-        <img id="mainImage" alt="Uploaded preview" />
-        <div class="overlay-layer" id="overlayLayer"></div>
-      </div>
-      <div class="error" id="errorText"></div>
-    </section>
-
-    <section class="panel right-panel">
-      <h2>Bubble Details</h2>
-      <div id="detailPlaceholder" class="placeholder">Select a bubble to edit its translation.</div>
-      <div id="detailForm" hidden>
-        <div class="field">
-          <label>Bubble ID</label>
-          <input id="bubbleId" type="text" readonly />
-        </div>
-        <div class="field">
-          <label>Original Text</label>
-          <textarea id="bubbleOriginal" readonly></textarea>
-        </div>
-        <div class="field">
-          <label>Translated Text</label>
-          <textarea id="bubbleText"></textarea>
-        </div>
-        <div class="field">
-          <label>Bubble Type</label>
-          <select id="bubbleType">
-            <option>Standard</option>
-            <option>Thought</option>
-            <option>Shouting</option>
-            <option>Whisper/Soft</option>
-            <option>Narration</option>
-            <option>Distorted/Custom</option>
-            <option>SFX</option>
-          </select>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script>
-    const imageInput = document.getElementById("imageInput");
-    const jsonInput = document.getElementById("jsonInput");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const statusText = document.getElementById("statusText");
-    const errorText = document.getElementById("errorText");
-    const mainImage = document.getElementById("mainImage");
-    const imageWrapper = document.getElementById("imageWrapper");
-    const imagePlaceholder = document.getElementById("imagePlaceholder");
-    const overlayLayer = document.getElementById("overlayLayer");
-    const bubbleList = document.getElementById("bubbleList");
-    const detailPlaceholder = document.getElementById("detailPlaceholder");
-    const detailForm = document.getElementById("detailForm");
-    const bubbleId = document.getElementById("bubbleId");
-    const bubbleOriginal = document.getElementById("bubbleOriginal");
-    const bubbleText = document.getElementById("bubbleText");
-    const bubbleType = document.getElementById("bubbleType");
-
-    const bubbleTypeOptions = Array.from(bubbleType.options).map((option) => option.value);
-
-    let loadedImageName = "";
-    let loadedJsonName = "";
-    let jsonData = null;
-    let selectedIndex = -1;
-
-    const updateStatus = () => {
-      const bubbleCount = jsonData?.items?.length ?? 0;
-      const parts = [];
-      if (loadedImageName) {
-        parts.push(`Image: ${loadedImageName}`);
+      .image-wrapper {
+        position: relative;
+        background: #111827;
+        border-radius: 12px;
+        overflow: hidden;
+        flex: 1;
+        min-height: 320px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
-      if (loadedJsonName) {
-        parts.push(`JSON: ${loadedJsonName}`);
-      }
-      if (bubbleCount) {
-        parts.push(`Bubbles: ${bubbleCount}`);
-      }
-      statusText.textContent = parts.length ? parts.join(" | ") : "No image or JSON loaded.";
-      downloadBtn.disabled = !jsonData;
-    };
 
-    const setError = (message) => {
-      errorText.textContent = message || "";
-    };
+      .image-wrapper img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
 
-    const resetSelection = () => {
-      selectedIndex = -1;
-      detailForm.hidden = true;
-      detailPlaceholder.hidden = false;
-      bubbleId.value = "";
-      bubbleOriginal.value = "";
-      bubbleText.value = "";
-      bubbleType.value = "Standard";
-    };
+      .overlay-layer {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        pointer-events: none;
+      }
 
-    const clearOverlays = () => {
-      overlayLayer.innerHTML = "";
-    };
+      .bubble-overlay {
+        position: absolute;
+        border: 2px solid rgba(255, 255, 255, 0.7);
+        background: rgba(59, 130, 246, 0.12);
+        border-radius: 6px;
+        pointer-events: auto;
+        cursor: pointer;
+        transition:
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
 
-    const normalizeItem = (item) => {
-      if (!item) return;
-      if (typeof item.text !== "string") {
-        item.text = "";
+      .bubble-overlay.active {
+        border-color: var(--accent);
+        background: rgba(59, 130, 246, 0.28);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
       }
-      if (!bubbleTypeOptions.includes(item.bubble_type)) {
-        item.bubble_type = "Standard";
-      }
-    };
 
-    const validateJsonStructure = (data) => {
-      if (!data || typeof data !== "object") {
-        return "JSON is not an object.";
+      .right-panel h2 {
+        margin-top: 0;
+        font-size: 18px;
       }
-      if (!data.image_size || typeof data.image_size.width !== "number" || typeof data.image_size.height !== "number") {
-        return "JSON image_size is missing width/height numbers.";
-      }
-      if (!Array.isArray(data.items)) {
-        return "JSON items must be an array.";
-      }
-      return "";
-    };
 
-    const renderBubbleList = () => {
-      bubbleList.innerHTML = "";
-      if (!jsonData?.items?.length) {
-        bubbleList.innerHTML = '<div class="placeholder" style="padding: 12px;">No bubbles loaded.</div>';
-        return;
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
       }
-      jsonData.items.forEach((item, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = `#${item.id ?? index + 1}`;
-        button.addEventListener("click", () => selectBubble(index));
-        if (index === selectedIndex) {
-          button.classList.add("active");
+
+      .field label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .field input,
+      .field textarea,
+      .field select {
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+        font-family: inherit;
+      }
+
+      .field textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+
+      .placeholder {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .error {
+        color: var(--error);
+        font-size: 14px;
+      }
+
+      @media (max-width: 1100px) {
+        main {
+          grid-template-columns: 180px minmax(0, 1fr) 280px;
         }
-        bubbleList.appendChild(button);
-      });
-    };
+      }
 
-    const renderOverlays = () => {
-      clearOverlays();
-      if (!jsonData || !mainImage.src) return;
-
-      const displayedWidth = mainImage.clientWidth;
-      const displayedHeight = mainImage.clientHeight;
-      overlayLayer.style.width = `${displayedWidth}px`;
-      overlayLayer.style.height = `${displayedHeight}px`;
-
-      const widthScale = displayedWidth / jsonData.image_size.width;
-      const heightScale = displayedHeight / jsonData.image_size.height;
-
-      jsonData.items.forEach((item, index) => {
-        const bbox = item.bbox_bubble;
-        if (!bbox) return;
-        const left = bbox.x_min * widthScale;
-        const top = bbox.y_min * heightScale;
-        const width = (bbox.x_max - bbox.x_min) * widthScale;
-        const height = (bbox.y_max - bbox.y_min) * heightScale;
-        const overlay = document.createElement("div");
-        overlay.className = "bubble-overlay";
-        overlay.style.left = `${left}px`;
-        overlay.style.top = `${top}px`;
-        overlay.style.width = `${width}px`;
-        overlay.style.height = `${height}px`;
-        overlay.addEventListener("click", () => selectBubble(index));
-        if (index === selectedIndex) {
-          overlay.classList.add("active");
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
         }
-        overlayLayer.appendChild(overlay);
-      });
-    };
 
-    const selectBubble = (index) => {
-      if (!jsonData?.items?.length) return;
-      const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
-      selectedIndex = clamped;
-      const item = jsonData.items[clamped];
-      normalizeItem(item);
-      bubbleId.value = item.id ?? clamped + 1;
-      bubbleOriginal.value = item.text_original ?? "";
-      bubbleText.value = item.text ?? "";
-      bubbleType.value = item.bubble_type;
-      detailPlaceholder.hidden = true;
-      detailForm.hidden = false;
-      renderBubbleList();
-      renderOverlays();
-    };
+        .left-panel,
+        .right-panel {
+          order: 2;
+        }
 
-    bubbleText.addEventListener("input", (event) => {
-      if (selectedIndex < 0 || !jsonData) return;
-      jsonData.items[selectedIndex].text = event.target.value;
-    });
+        .image-panel {
+          order: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Manga Bubble Translator</h1>
+        <div class="status" id="statusText">No image or JSON loaded.</div>
+      </div>
+      <div class="toolbar">
+        <label>
+          Upload Image
+          <input type="file" id="imageInput" accept="image/png, image/jpeg" />
+        </label>
+        <label>
+          Upload JSON
+          <input type="file" id="jsonInput" accept="application/json" />
+        </label>
+        <button id="downloadBtn" disabled>Download JSON</button>
+      </div>
+    </header>
 
-    bubbleType.addEventListener("change", (event) => {
-      if (selectedIndex < 0 || !jsonData) return;
-      jsonData.items[selectedIndex].bubble_type = event.target.value;
-    });
+    <main>
+      <section class="panel left-panel">
+        <strong>Bubble List</strong>
+        <div class="bubble-list" id="bubbleList"></div>
+      </section>
 
-    imageInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        mainImage.src = loadEvent.target.result;
-        loadedImageName = file.name;
-        imagePlaceholder.style.display = "none";
-        mainImage.onload = () => {
-          renderOverlays();
-        };
-        updateStatus();
+      <section class="image-panel">
+        <div class="panel image-wrapper" id="imageWrapper">
+          <div class="placeholder" id="imagePlaceholder">
+            Upload an image to begin.
+          </div>
+          <img id="mainImage" alt="Uploaded preview" />
+          <div class="overlay-layer" id="overlayLayer"></div>
+        </div>
+        <div class="error" id="errorText"></div>
+      </section>
+
+      <section class="panel right-panel">
+        <h2>Bubble Details</h2>
+        <div id="detailPlaceholder" class="placeholder">
+          Select a bubble to edit its translation.
+        </div>
+        <div id="detailForm" hidden>
+          <div class="field">
+            <label>Bubble ID</label>
+            <input id="bubbleId" type="text" readonly />
+          </div>
+          <div class="field">
+            <label>Original Text</label>
+            <textarea id="bubbleOriginal" readonly></textarea>
+          </div>
+          <div class="field">
+            <label>Translated Text</label>
+            <textarea id="bubbleText"></textarea>
+          </div>
+          <div class="field">
+            <label>Bubble Type</label>
+            <select id="bubbleType">
+              <option>Standard</option>
+              <option>Thought</option>
+              <option>Shouting</option>
+              <option>Whisper/Soft</option>
+              <option>Narration</option>
+              <option>Distorted/Custom</option>
+              <option>SFX</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const imageInput = document.getElementById("imageInput");
+      const jsonInput = document.getElementById("jsonInput");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const statusText = document.getElementById("statusText");
+      const errorText = document.getElementById("errorText");
+      const mainImage = document.getElementById("mainImage");
+      const imageWrapper = document.getElementById("imageWrapper");
+      const imagePlaceholder = document.getElementById("imagePlaceholder");
+      const overlayLayer = document.getElementById("overlayLayer");
+      const bubbleList = document.getElementById("bubbleList");
+      const detailPlaceholder = document.getElementById("detailPlaceholder");
+      const detailForm = document.getElementById("detailForm");
+      const bubbleId = document.getElementById("bubbleId");
+      const bubbleOriginal = document.getElementById("bubbleOriginal");
+      const bubbleText = document.getElementById("bubbleText");
+      const bubbleType = document.getElementById("bubbleType");
+
+      const bubbleTypeOptions = Array.from(bubbleType.options).map(
+        (option) => option.value,
+      );
+
+      let loadedImageName = "";
+      let loadedJsonName = "";
+      let jsonData = null;
+      let selectedIndex = -1;
+
+      const updateStatus = () => {
+        const bubbleCount = jsonData?.items?.length ?? 0;
+        const parts = [];
+        if (loadedImageName) {
+          parts.push(`Image: ${loadedImageName}`);
+        }
+        if (loadedJsonName) {
+          parts.push(`JSON: ${loadedJsonName}`);
+        }
+        if (bubbleCount) {
+          parts.push(`Bubbles: ${bubbleCount}`);
+        }
+        statusText.textContent = parts.length
+          ? parts.join(" | ")
+          : "No image or JSON loaded.";
+        downloadBtn.disabled = !jsonData;
       };
-      reader.readAsDataURL(file);
-    });
 
-    jsonInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        try {
-          const data = JSON.parse(loadEvent.target.result);
-          const error = validateJsonStructure(data);
-          if (error) {
-            setError(error);
-            jsonData = null;
+      const setError = (message) => {
+        errorText.textContent = message || "";
+      };
+
+      const resetSelection = () => {
+        selectedIndex = -1;
+        detailForm.hidden = true;
+        detailPlaceholder.hidden = false;
+        bubbleId.value = "";
+        bubbleOriginal.value = "";
+        bubbleText.value = "";
+        bubbleType.value = "Standard";
+      };
+
+      const clearOverlays = () => {
+        overlayLayer.innerHTML = "";
+      };
+
+      const normalizeItem = (item) => {
+        if (!item) return;
+        if (typeof item.text !== "string") {
+          item.text = "";
+        }
+        if (!bubbleTypeOptions.includes(item.bubble_type)) {
+          item.bubble_type = "Standard";
+        }
+      };
+
+      const validateJsonStructure = (data) => {
+        if (!data || typeof data !== "object") {
+          return "JSON is not an object.";
+        }
+        if (
+          !data.image_size ||
+          typeof data.image_size.width !== "number" ||
+          typeof data.image_size.height !== "number"
+        ) {
+          return "JSON image_size is missing width/height numbers.";
+        }
+        if (!Array.isArray(data.items)) {
+          return "JSON items must be an array.";
+        }
+        return "";
+      };
+
+      const renderBubbleList = () => {
+        bubbleList.innerHTML = "";
+        if (!jsonData?.items?.length) {
+          bubbleList.innerHTML =
+            '<div class="placeholder" style="padding: 12px;">No bubbles loaded.</div>';
+          return;
+        }
+        jsonData.items.forEach((item, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = `#${item.id ?? index + 1}`;
+          button.addEventListener("click", () => selectBubble(index));
+          if (index === selectedIndex) {
+            button.classList.add("active");
+          }
+          bubbleList.appendChild(button);
+        });
+      };
+
+      const renderOverlays = () => {
+        clearOverlays();
+        if (!jsonData || !mainImage.src) return;
+
+        const displayedWidth = mainImage.clientWidth;
+        const displayedHeight = mainImage.clientHeight;
+        overlayLayer.style.width = `${displayedWidth}px`;
+        overlayLayer.style.height = `${displayedHeight}px`;
+
+        const widthScale = displayedWidth / jsonData.image_size.width;
+        const heightScale = displayedHeight / jsonData.image_size.height;
+
+        jsonData.items.forEach((item, index) => {
+          const bbox = item.bbox_bubble;
+          if (!bbox) return;
+          const left = bbox.x_min * widthScale;
+          const top = bbox.y_min * heightScale;
+          const width = (bbox.x_max - bbox.x_min) * widthScale;
+          const height = (bbox.y_max - bbox.y_min) * heightScale;
+          const overlay = document.createElement("div");
+          overlay.className = "bubble-overlay";
+          overlay.style.left = `${left}px`;
+          overlay.style.top = `${top}px`;
+          overlay.style.width = `${width}px`;
+          overlay.style.height = `${height}px`;
+          overlay.addEventListener("click", () => selectBubble(index));
+          if (index === selectedIndex) {
+            overlay.classList.add("active");
+          }
+          overlayLayer.appendChild(overlay);
+        });
+      };
+
+      const selectBubble = (index) => {
+        if (!jsonData?.items?.length) return;
+        const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
+        selectedIndex = clamped;
+        const item = jsonData.items[clamped];
+        normalizeItem(item);
+        bubbleId.value = item.id ?? clamped + 1;
+        bubbleOriginal.value = item.text_original ?? "";
+        bubbleText.value = item.text ?? "";
+        bubbleType.value = item.bubble_type;
+        detailPlaceholder.hidden = true;
+        detailForm.hidden = false;
+        renderBubbleList();
+        renderOverlays();
+      };
+
+      bubbleText.addEventListener("input", (event) => {
+        if (selectedIndex < 0 || !jsonData) return;
+        jsonData.items[selectedIndex].text = event.target.value;
+      });
+
+      bubbleType.addEventListener("change", (event) => {
+        if (selectedIndex < 0 || !jsonData) return;
+        jsonData.items[selectedIndex].bubble_type = event.target.value;
+      });
+
+      imageInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          mainImage.src = loadEvent.target.result;
+          loadedImageName = file.name;
+          imagePlaceholder.style.display = "none";
+          mainImage.onload = () => {
+            renderOverlays();
+          };
+          updateStatus();
+        };
+        reader.readAsDataURL(file);
+      });
+
+      jsonInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          try {
+            const data = JSON.parse(loadEvent.target.result);
+            const error = validateJsonStructure(data);
+            if (error) {
+              setError(error);
+              jsonData = null;
+              resetSelection();
+              renderBubbleList();
+              renderOverlays();
+              updateStatus();
+              return;
+            }
+            data.items.forEach((item) => normalizeItem(item));
+            jsonData = data;
+            loadedJsonName = file.name;
+            setError("");
             resetSelection();
             renderBubbleList();
             renderOverlays();
             updateStatus();
-            return;
+          } catch (err) {
+            setError("Invalid JSON file.");
           }
-          data.items.forEach((item) => normalizeItem(item));
-          jsonData = data;
-          loadedJsonName = file.name;
-          setError("");
-          resetSelection();
-          renderBubbleList();
-          renderOverlays();
-          updateStatus();
-        } catch (err) {
-          setError("Invalid JSON file.");
-        }
+        };
+        reader.readAsText(file);
+      });
+
+      const downloadJson = () => {
+        if (!jsonData) return;
+        const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "translated-bubbles.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
       };
-      reader.readAsText(file);
-    });
 
-    const downloadJson = () => {
-      if (!jsonData) return;
-      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "translated-bubbles.json";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    };
+      downloadBtn.addEventListener("click", downloadJson);
 
-    downloadBtn.addEventListener("click", downloadJson);
+      window.addEventListener("resize", () => {
+        renderOverlays();
+      });
 
-    window.addEventListener("resize", () => {
-      renderOverlays();
-    });
+      document.addEventListener("keydown", (event) => {
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.key.toLowerCase() === "s"
+        ) {
+          event.preventDefault();
+          downloadJson();
+          return;
+        }
+        if (!jsonData?.items?.length) return;
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          selectBubble(selectedIndex + 1);
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          selectBubble(selectedIndex - 1);
+        }
+      });
 
-    document.addEventListener("keydown", (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        downloadJson();
-        return;
-      }
-      if (!jsonData?.items?.length) return;
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        selectBubble(selectedIndex + 1);
-      }
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        selectBubble(selectedIndex - 1);
-      }
-    });
-
-    // How to run locally:
-    // 1) Save this file as index.html.
-    // 2) Open index.html in your browser.
-    updateStatus();
-  </script>
-</body>
+      // How to run locally:
+      // 1) Save this file as index.html.
+      // 2) Open index.html in your browser.
+      updateStatus();
+    </script>
+  </body>
 </html>
