@@ -511,6 +511,18 @@
       let activePointerId = null;
       let panRaf = 0;
       let pendingPan = null;
+      const logDragEvent = (message, event, details = {}) => {
+        console.info(`[drag] ${message}`, {
+          pointerId: event?.pointerId ?? null,
+          buttons: event?.buttons ?? null,
+          clientX: event?.clientX ?? null,
+          clientY: event?.clientY ?? null,
+          panX,
+          panY,
+          zoomLevel,
+          ...details,
+        });
+      };
 
       const MIN_ZOOM = 0.4;
       const MAX_ZOOM = 3;
@@ -974,6 +986,12 @@
         dragStartY = event.clientY;
         panStartX = panX;
         panStartY = panY;
+        logDragEvent("start", event, {
+          dragStartX,
+          dragStartY,
+          panStartX,
+          panStartY,
+        });
         imageWrapper.classList.add("grabbing");
         imageStage.classList.add("is-dragging");
         imageWrapper.setPointerCapture(event.pointerId);
@@ -995,7 +1013,8 @@
       imageWrapper.addEventListener("pointermove", (event) => {
         if (!isDragging) return;
         if (!event.buttons) {
-          stopDragging();
+          logDragEvent("stop-no-buttons", event);
+          stopDragging(event);
           return;
         }
         const deltaX = event.clientX - dragStartX;
@@ -1003,9 +1022,10 @@
         schedulePanUpdate(panStartX + deltaX, panStartY + deltaY);
       });
 
-      const stopDragging = () => {
+      const stopDragging = (event, reason = "stop") => {
         if (!isDragging) return;
         isDragging = false;
+        logDragEvent(reason, event);
         imageWrapper.classList.remove("grabbing");
         imageStage.classList.remove("is-dragging");
         pendingPan = null;
@@ -1022,16 +1042,26 @@
       const handlePointerLeave = (event) => {
         if (!isDragging) return;
         if (event.buttons) return;
-        stopDragging();
+        stopDragging(event, "stop-pointer-leave");
       };
 
-      imageWrapper.addEventListener("pointerup", stopDragging);
-      imageWrapper.addEventListener("pointercancel", stopDragging);
+      imageWrapper.addEventListener("pointerup", (event) =>
+        stopDragging(event, "stop-pointer-up"),
+      );
+      imageWrapper.addEventListener("pointercancel", (event) =>
+        stopDragging(event, "stop-pointer-cancel"),
+      );
       imageWrapper.addEventListener("pointerleave", handlePointerLeave);
-      imageWrapper.addEventListener("lostpointercapture", stopDragging);
-      window.addEventListener("pointerup", stopDragging);
-      window.addEventListener("pointercancel", stopDragging);
-      window.addEventListener("blur", stopDragging);
+      imageWrapper.addEventListener("lostpointercapture", (event) =>
+        stopDragging(event, "stop-lost-pointer-capture"),
+      );
+      window.addEventListener("pointerup", (event) =>
+        stopDragging(event, "stop-window-pointer-up"),
+      );
+      window.addEventListener("pointercancel", (event) =>
+        stopDragging(event, "stop-window-pointer-cancel"),
+      );
+      window.addEventListener("blur", () => stopDragging(null, "stop-blur"));
 
       const panBy = (deltaX, deltaY) => {
         if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
