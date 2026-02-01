@@ -208,6 +208,8 @@
         border: 1px solid rgba(148, 163, 184, 0.4);
         backdrop-filter: blur(6px);
         z-index: 3;
+        align-items: center;
+        flex-wrap: wrap;
       }
 
       .image-toolbar button {
@@ -236,17 +238,31 @@
         border: 1px solid rgba(148, 163, 184, 0.4);
       }
 
+      .zoom-range {
+        width: 120px;
+        accent-color: var(--accent);
+      }
+
       .image-stage {
         position: relative;
         display: inline-flex;
         transform-origin: center;
         transition: transform 0.15s ease;
+        border-radius: 16px;
+        border: 2px solid rgba(148, 163, 184, 0.4);
+        will-change: transform;
+        overflow: hidden;
+      }
+
+      .image-stage.is-dragging {
+        transition: none;
       }
 
       .image-wrapper img {
         max-width: 100%;
         height: auto;
         display: block;
+        border-radius: 14px;
       }
 
       .overlay-layer {
@@ -384,6 +400,16 @@
             <button type="button" id="zoomResetBtn" title="Reset zoom">
               Reset
             </button>
+            <input
+              class="zoom-range"
+              type="range"
+              id="zoomRange"
+              min="40"
+              max="300"
+              step="5"
+              value="100"
+              aria-label="Zoom level"
+            />
             <span class="zoom-label" id="zoomLabel">100%</span>
           </div>
           <div class="placeholder" id="imagePlaceholder">
@@ -465,6 +491,7 @@
       const zoomInBtn = document.getElementById("zoomInBtn");
       const zoomResetBtn = document.getElementById("zoomResetBtn");
       const zoomLabel = document.getElementById("zoomLabel");
+      const zoomRange = document.getElementById("zoomRange");
 
       const bubbleTypeOptions = Array.from(bubbleType.options).map(
         (option) => option.value,
@@ -481,11 +508,14 @@
       let dragStartY = 0;
       let panStartX = 0;
       let panStartY = 0;
+      let panRaf = 0;
+      let pendingPan = null;
 
       const MIN_ZOOM = 0.4;
       const MAX_ZOOM = 3;
       const ZOOM_STEP = 0.2;
       const PAN_STEP = 80;
+      const PAN_MARGIN = 120;
 
       const getBaseName = (filename) => filename.replace(/\.[^/.]+$/, "");
 
@@ -546,14 +576,18 @@
         return Math.max(0, (scaledHeight - wrapperHeight) / 2);
       };
 
+      const getPanLimitX = () => getMaxPanX() + PAN_MARGIN;
+
+      const getPanLimitY = () => getMaxPanY() + PAN_MARGIN;
+
       const clampPanX = (value) => {
-        const maxPan = getMaxPanX();
-        return Math.min(maxPan, Math.max(-maxPan, value));
+        const limit = getPanLimitX();
+        return Math.min(limit, Math.max(-limit, value));
       };
 
       const clampPanY = (value) => {
-        const maxPan = getMaxPanY();
-        return Math.min(maxPan, Math.max(-maxPan, value));
+        const limit = getPanLimitY();
+        return Math.min(limit, Math.max(-limit, value));
       };
 
       const updateTransform = () => {
@@ -561,7 +595,7 @@
       };
 
       const updateGrabState = () => {
-        const canPan = getMaxPanX() > 0.5 || getMaxPanY() > 0.5;
+        const canPan = getPanLimitX() > 0.5 || getPanLimitY() > 0.5;
         imageWrapper.classList.toggle("grabbable", canPan);
         if (!canPan) {
           panX = 0;
@@ -583,6 +617,7 @@
         zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM + 0.001;
         zoomInBtn.disabled = zoomLevel >= MAX_ZOOM - 0.001;
         zoomResetBtn.disabled = Math.abs(zoomLevel - 1) < 0.001;
+        zoomRange.value = Math.round(zoomLevel * 100);
         updateGrabState();
       };
 
@@ -917,6 +952,11 @@
         applyZoom(1);
       });
 
+      zoomRange.addEventListener("input", (event) => {
+        const value = Number(event.target.value) / 100;
+        applyZoom(value);
+      });
+
       window.addEventListener("resize", () => {
         renderOverlays();
         updateGrabState();
@@ -926,29 +966,43 @@
         if (event.button !== 0) return;
         if (event.target.closest(".image-toolbar")) return;
         if (event.target.closest(".bubble-overlay")) return;
-        if (getMaxPanX() <= 0.5 && getMaxPanY() <= 0.5) return;
+        if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
         isDragging = true;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
         panStartX = panX;
         panStartY = panY;
         imageWrapper.classList.add("grabbing");
+        imageStage.classList.add("is-dragging");
         imageWrapper.setPointerCapture(event.pointerId);
       });
+
+      const schedulePanUpdate = (nextPanX, nextPanY) => {
+        pendingPan = { x: nextPanX, y: nextPanY };
+        if (panRaf) return;
+        panRaf = requestAnimationFrame(() => {
+          if (!pendingPan) return;
+          panX = clampPanX(pendingPan.x);
+          panY = clampPanY(pendingPan.y);
+          updateTransform();
+          pendingPan = null;
+          panRaf = 0;
+        });
+      };
 
       imageWrapper.addEventListener("pointermove", (event) => {
         if (!isDragging) return;
         const deltaX = event.clientX - dragStartX;
         const deltaY = event.clientY - dragStartY;
-        panX = clampPanX(panStartX + deltaX);
-        panY = clampPanY(panStartY + deltaY);
-        updateTransform();
+        schedulePanUpdate(panStartX + deltaX, panStartY + deltaY);
       });
 
       const stopDragging = () => {
         if (!isDragging) return;
         isDragging = false;
         imageWrapper.classList.remove("grabbing");
+        imageStage.classList.remove("is-dragging");
+        pendingPan = null;
       };
 
       imageWrapper.addEventListener("pointerup", stopDragging);
@@ -956,7 +1010,7 @@
       imageWrapper.addEventListener("pointerleave", stopDragging);
 
       const panBy = (deltaX, deltaY) => {
-        if (getMaxPanX() <= 0.5 && getMaxPanY() <= 0.5) return;
+        if (getPanLimitX() <= 0.5 && getPanLimitY() <= 0.5) return;
         panX = clampPanX(panX + deltaX);
         panY = clampPanY(panY + deltaY);
         updateTransform();
