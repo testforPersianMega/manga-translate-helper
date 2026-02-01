@@ -460,9 +460,12 @@
       let selectedIndex = -1;
       let zoomLevel = 1;
       let panX = 0;
+      let panY = 0;
       let isDragging = false;
       let dragStartX = 0;
+      let dragStartY = 0;
       let panStartX = 0;
+      let panStartY = 0;
 
       const MIN_ZOOM = 0.4;
       const MAX_ZOOM = 3;
@@ -513,7 +516,7 @@
         errorText.textContent = message || "";
       };
 
-      const getMaxPan = () => {
+      const getMaxPanX = () => {
         const wrapperWidth = imageWrapper.clientWidth;
         const imageWidth = mainImage.clientWidth;
         if (!wrapperWidth || !imageWidth) return 0;
@@ -521,30 +524,46 @@
         return Math.max(0, (scaledWidth - wrapperWidth) / 2);
       };
 
-      const clampPan = (value) => {
-        const maxPan = getMaxPan();
+      const getMaxPanY = () => {
+        const wrapperHeight = imageWrapper.clientHeight;
+        const imageHeight = mainImage.clientHeight;
+        if (!wrapperHeight || !imageHeight) return 0;
+        const scaledHeight = imageHeight * zoomLevel;
+        return Math.max(0, (scaledHeight - wrapperHeight) / 2);
+      };
+
+      const clampPanX = (value) => {
+        const maxPan = getMaxPanX();
+        return Math.min(maxPan, Math.max(-maxPan, value));
+      };
+
+      const clampPanY = (value) => {
+        const maxPan = getMaxPanY();
         return Math.min(maxPan, Math.max(-maxPan, value));
       };
 
       const updateTransform = () => {
-        imageStage.style.transform = `translateX(${panX / zoomLevel}px) scale(${zoomLevel})`;
+        imageStage.style.transform = `translate(${panX / zoomLevel}px, ${panY / zoomLevel}px) scale(${zoomLevel})`;
       };
 
       const updateGrabState = () => {
-        const canPan = getMaxPan() > 0.5;
+        const canPan = getMaxPanX() > 0.5 || getMaxPanY() > 0.5;
         imageWrapper.classList.toggle("grabbable", canPan);
         if (!canPan) {
           panX = 0;
+          panY = 0;
           updateTransform();
         } else {
-          panX = clampPan(panX);
+          panX = clampPanX(panX);
+          panY = clampPanY(panY);
           updateTransform();
         }
       };
 
       const applyZoom = (level) => {
         zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, level));
-        panX = clampPan(panX);
+        panX = clampPanX(panX);
+        panY = clampPanY(panY);
         updateTransform();
         zoomLabel.textContent = `${Math.round(zoomLevel * 100)}%`;
         zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM + 0.001;
@@ -720,6 +739,7 @@
           updateGrabState();
         };
         panX = 0;
+        panY = 0;
         applyZoom(1);
         resetSelection();
         renderPageList();
@@ -891,18 +911,22 @@
       imageWrapper.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
         if (event.target.closest(".bubble-overlay")) return;
-        if (getMaxPan() <= 0.5) return;
+        if (getMaxPanX() <= 0.5 && getMaxPanY() <= 0.5) return;
         isDragging = true;
         dragStartX = event.clientX;
+        dragStartY = event.clientY;
         panStartX = panX;
+        panStartY = panY;
         imageWrapper.classList.add("grabbing");
         imageWrapper.setPointerCapture(event.pointerId);
       });
 
       imageWrapper.addEventListener("pointermove", (event) => {
         if (!isDragging) return;
-        const delta = event.clientX - dragStartX;
-        panX = clampPan(panStartX + delta);
+        const deltaX = event.clientX - dragStartX;
+        const deltaY = event.clientY - dragStartY;
+        panX = clampPanX(panStartX + deltaX);
+        panY = clampPanY(panStartY + deltaY);
         updateTransform();
       });
 
@@ -916,9 +940,10 @@
       imageWrapper.addEventListener("pointercancel", stopDragging);
       imageWrapper.addEventListener("pointerleave", stopDragging);
 
-      const panBy = (delta) => {
-        if (getMaxPan() <= 0.5) return;
-        panX = clampPan(panX + delta);
+      const panBy = (deltaX, deltaY) => {
+        if (getMaxPanX() <= 0.5 && getMaxPanY() <= 0.5) return;
+        panX = clampPanX(panX + deltaX);
+        panY = clampPanY(panY + deltaY);
         updateTransform();
       };
 
@@ -954,17 +979,28 @@
           if (event.key === "0") {
             event.preventDefault();
             panX = 0;
+            panY = 0;
             applyZoom(1);
             return;
           }
           if (event.shiftKey && event.key === "ArrowLeft") {
             event.preventDefault();
-            panBy(-PAN_STEP);
+            panBy(-PAN_STEP, 0);
             return;
           }
           if (event.shiftKey && event.key === "ArrowRight") {
             event.preventDefault();
-            panBy(PAN_STEP);
+            panBy(PAN_STEP, 0);
+            return;
+          }
+          if (event.shiftKey && event.key === "ArrowUp") {
+            event.preventDefault();
+            panBy(0, -PAN_STEP);
+            return;
+          }
+          if (event.shiftKey && event.key === "ArrowDown") {
+            event.preventDefault();
+            panBy(0, PAN_STEP);
             return;
           }
         }
