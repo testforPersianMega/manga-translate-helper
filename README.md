@@ -21,6 +21,8 @@ This is a single-page helper for reviewing manga bubble detection JSON alongside
 | Reset zoom/position | `0` |
 | Pan image left | `Shift + Arrow Left` |
 | Pan image right | `Shift + Arrow Right` |
+| Pan image up | `Shift + Arrow Up` |
+| Pan image down | `Shift + Arrow Down` |
 
 ## Usage
 
