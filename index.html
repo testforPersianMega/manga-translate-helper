@@ -1022,12 +1022,32 @@
         schedulePanUpdate(panStartX + deltaX, panStartY + deltaY);
       });
 
+      const finalizePan = (event) => {
+        if (pendingPan) {
+          panX = clampPanX(pendingPan.x);
+          panY = clampPanY(pendingPan.y);
+          updateTransform();
+          return;
+        }
+        if (!event || typeof event.clientX !== "number") return;
+        const deltaX = event.clientX - dragStartX;
+        const deltaY = event.clientY - dragStartY;
+        panX = clampPanX(panStartX + deltaX);
+        panY = clampPanY(panStartY + deltaY);
+        updateTransform();
+      };
+
       const stopDragging = (event, reason = "stop") => {
         if (!isDragging) return;
         isDragging = false;
         logDragEvent(reason, event);
         imageWrapper.classList.remove("grabbing");
         imageStage.classList.remove("is-dragging");
+        if (panRaf) {
+          cancelAnimationFrame(panRaf);
+          panRaf = 0;
+        }
+        finalizePan(event);
         pendingPan = null;
         if (activePointerId !== null) {
           try {
