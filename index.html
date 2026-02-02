@@ -562,6 +562,24 @@
             </select>
           </div>
         </div>
+        <h2>Settings</h2>
+        <div class="field">
+          <label>
+            <input type="checkbox" id="autoPanToggle" checked />
+            Auto-pan bubble into view on arrow navigation
+          </label>
+        </div>
+        <div class="field">
+          <label for="bubbleMarginInput">Bubble view margin (px)</label>
+          <input
+            id="bubbleMarginInput"
+            type="number"
+            min="0"
+            max="300"
+            step="5"
+            value="80"
+          />
+        </div>
       </section>
     </main>
 
@@ -586,6 +604,8 @@
       const bubbleOriginal = document.getElementById("bubbleOriginal");
       const bubbleText = document.getElementById("bubbleText");
       const bubbleType = document.getElementById("bubbleType");
+      const autoPanToggle = document.getElementById("autoPanToggle");
+      const bubbleMarginInput = document.getElementById("bubbleMarginInput");
       const zoomOutBtn = document.getElementById("zoomOutBtn");
       const zoomInBtn = document.getElementById("zoomInBtn");
       const zoomResetBtn = document.getElementById("zoomResetBtn");
@@ -640,7 +660,10 @@
       const PAN_STEP = 80;
       const PAN_MARGIN = 120;
       const MIN_BBOX_SIZE = 12;
-      const BUBBLE_VIEW_MARGIN = 80;
+      const DEFAULT_BUBBLE_VIEW_MARGIN = 80;
+
+      let autoPanEnabled = true;
+      let bubbleViewMargin = DEFAULT_BUBBLE_VIEW_MARGIN;
 
       const getBaseName = (filename) => filename.replace(/\.[^/.]+$/, "");
 
@@ -1377,6 +1400,24 @@
         jsonData.items[selectedIndex].bubble_type = event.target.value;
       });
 
+      const updateBubbleMarginValue = (value) => {
+        const nextValue = Number.parseInt(value, 10);
+        if (!Number.isFinite(nextValue)) return;
+        bubbleViewMargin = clamp(nextValue, 0, 300);
+        bubbleMarginInput.value = bubbleViewMargin;
+      };
+
+      autoPanToggle.addEventListener("change", (event) => {
+        autoPanEnabled = event.target.checked;
+      });
+
+      bubbleMarginInput.addEventListener("input", (event) => {
+        updateBubbleMarginValue(event.target.value);
+      });
+
+      autoPanEnabled = autoPanToggle.checked;
+      updateBubbleMarginValue(bubbleMarginInput.value);
+
       const setCurrentPage = (index) => {
         if (index < 0 || index >= pages.length) return;
         currentPageIndex = index;
@@ -2035,6 +2076,7 @@
       window.addEventListener("blur", () => stopDragging(null, "stop-blur"));
 
       const ensureBubbleInView = (index) => {
+        if (!autoPanEnabled) return;
         const jsonData = getCurrentJson();
         if (!jsonData?.items?.length || index < 0) return;
         const item = jsonData.items[index];
@@ -2057,10 +2099,11 @@
         const topEdge = (yMin - stageCenterY) * zoomLevel + panY;
         const bottomEdge = (yMax - stageCenterY) * zoomLevel + panY;
 
-        const leftBound = -wrapperWidth / 2 + BUBBLE_VIEW_MARGIN;
-        const rightBound = wrapperWidth / 2 - BUBBLE_VIEW_MARGIN;
-        const topBound = -wrapperHeight / 2 + BUBBLE_VIEW_MARGIN;
-        const bottomBound = wrapperHeight / 2 - BUBBLE_VIEW_MARGIN;
+        const margin = bubbleViewMargin;
+        const leftBound = -wrapperWidth / 2 + margin;
+        const rightBound = wrapperWidth / 2 - margin;
+        const topBound = -wrapperHeight / 2 + margin;
+        const bottomBound = wrapperHeight / 2 - margin;
 
         const bubbleWidth = (xMax - xMin) * zoomLevel;
         const bubbleHeight = (yMax - yMin) * zoomLevel;
@@ -2070,7 +2113,7 @@
         let nextPanX = panX;
         let nextPanY = panY;
 
-        if (bubbleWidth + BUBBLE_VIEW_MARGIN * 2 > wrapperWidth) {
+        if (bubbleWidth + margin * 2 > wrapperWidth) {
           nextPanX = -((bubbleCenterX - stageCenterX) * zoomLevel);
         } else if (leftEdge < leftBound) {
           nextPanX += leftBound - leftEdge;
@@ -2078,7 +2121,7 @@
           nextPanX += rightBound - rightEdge;
         }
 
-        if (bubbleHeight + BUBBLE_VIEW_MARGIN * 2 > wrapperHeight) {
+        if (bubbleHeight + margin * 2 > wrapperHeight) {
           nextPanY = -((bubbleCenterY - stageCenterY) * zoomLevel);
         } else if (topEdge < topBound) {
           nextPanY += topBound - topEdge;
