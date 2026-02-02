@@ -645,6 +645,24 @@
 
       const getCurrentPage = () => pages[currentPageIndex] ?? null;
 
+      const logOrderEvent = (message, details = {}) => {
+        console.info(`[order] ${message}`, {
+          currentPageIndex,
+          currentIndex: selectedIndex,
+          pageName: getCurrentPage()?.jsonName ?? getCurrentPage()?.imageName,
+          ...details,
+        });
+      };
+
+      const logOverlapEvent = (message, details = {}) => {
+        console.info(`[overlap] ${message}`, {
+          currentPageIndex,
+          currentIndex: selectedIndex,
+          pageName: getCurrentPage()?.jsonName ?? getCurrentPage()?.imageName,
+          ...details,
+        });
+      };
+
       const getCurrentJson = () => getCurrentPage()?.jsonData ?? null;
 
       const getPageStatusTags = (page) => {
@@ -800,6 +818,7 @@
       };
 
       const getRowBasedBubbleIndices = (jsonData) => {
+        logOrderEvent("row-order-start", { itemCount: jsonData.items.length });
         const entries = jsonData.items.map((item, index) => {
           const bbox = getItemBbox(item);
           if (!bbox) {
@@ -834,6 +853,9 @@
         const withBbox = entries.filter((entry) => entry.bbox);
         const withoutBbox = entries.filter((entry) => !entry.bbox);
         if (!withBbox.length) {
+          logOrderEvent("row-order-no-bbox", {
+            orderedIndices: entries.map((entry) => entry.index),
+          });
           return entries.map((entry) => entry.index);
         }
         const anchor = withBbox.reduce((best, entry) => {
@@ -862,7 +884,12 @@
             return a.index - b.index;
           })
           .map((entry) => entry.index);
-        return ordered.concat(withoutBbox.map((entry) => entry.index));
+        const result = ordered.concat(withoutBbox.map((entry) => entry.index));
+        logOrderEvent("row-order-complete", {
+          anchorIndex: anchor?.index ?? null,
+          orderedIndices: result,
+        });
+        return result;
       };
 
       const fillMissingBubbleOrders = (jsonData) => {
@@ -882,11 +909,22 @@
           }
           item.order = nextOrder;
           usedOrders.add(nextOrder);
+          logOrderEvent("filled-missing-order", {
+            index,
+            assignedOrder: nextOrder,
+          });
+        });
+        logOrderEvent("fill-missing-complete", {
+          usedOrders: Array.from(usedOrders).sort((a, b) => a - b),
+          rowOrder,
         });
       };
 
       const normalizeBubbleOrders = (jsonData) => {
         if (!jsonData?.items?.length) return;
+        logOrderEvent("normalize-start", {
+          orders: jsonData.items.map((item) => item.order ?? null),
+        });
         fillMissingBubbleOrders(jsonData);
         const rowOrder = getRowBasedBubbleIndices(jsonData);
         const rowRank = new Map(
@@ -914,6 +952,10 @@
         entries.forEach((entry, position) => {
           jsonData.items[entry.index].order = position + 1;
         });
+        logOrderEvent("normalize-complete", {
+          orderedEntries: entries,
+          finalOrders: jsonData.items.map((item) => item.order),
+        });
       };
 
       const ensureBubbleOrders = (jsonData) => {
@@ -922,8 +964,11 @@
           (item) => !Number.isFinite(Number(item.order)),
         );
         if (hasMissing) {
+          logOrderEvent("ensure-missing-orders", { hasMissing });
           normalizeBubbleOrders(jsonData);
+          return;
         }
+        logOrderEvent("ensure-orders-present", { hasMissing });
       };
 
       const getOrderedBubbleIndices = (jsonData) => {
@@ -944,7 +989,9 @@
           }
           return a.index - b.index;
         });
-        return entries.map((entry) => entry.index);
+        const orderedIndices = entries.map((entry) => entry.index);
+        logOrderEvent("ordered-indices", { orderedIndices, entries });
+        return orderedIndices;
       };
 
       const getBubbleXCenter = (item) => {
@@ -970,7 +1017,7 @@
         const currentBbox = getItemBbox(currentItem);
         if (!currentBbox) return [];
         const currentXCenter = getBubbleXCenter(currentItem);
-        return jsonData.items
+        const overlapping = jsonData.items
           .map((item, index) => {
             if (index === currentIndex) return null;
             const bbox = getItemBbox(item);
@@ -988,11 +1035,17 @@
             return a.index - b.index;
           })
           .map((entry) => entry.index);
+        logOverlapEvent("overlap-detected", {
+          currentIndex,
+          overlappingIndices: overlapping,
+        });
+        return overlapping;
       };
 
       const getAutoPriorityBubbleIndices = (jsonData, currentIndex) => {
         const orderedIndices = getOrderedBubbleIndices(jsonData);
         if (!orderedIndices.length || currentIndex < 0) {
+          logOrderEvent("auto-priority-no-current", { orderedIndices });
           return orderedIndices;
         }
         const currentPosition = orderedIndices.indexOf(currentIndex);
@@ -1002,6 +1055,10 @@
           currentIndex,
         );
         if (!overlappingIndices.length) {
+          logOverlapEvent("auto-priority-no-overlap", {
+            currentIndex,
+            orderedIndices,
+          });
           return orderedIndices;
         }
         const overlapSet = new Set(overlappingIndices);
@@ -1011,12 +1068,19 @@
         const afterCurrent = orderedIndices
           .slice(currentPosition + 1)
           .filter((index) => !overlapSet.has(index));
-        return [
+        const prioritized = [
           ...beforeCurrent,
           currentIndex,
           ...overlappingIndices,
           ...afterCurrent,
         ];
+        logOverlapEvent("auto-priority-overlap", {
+          currentIndex,
+          orderedIndices,
+          overlappingIndices,
+          prioritized,
+        });
+        return prioritized;
       };
 
       const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
@@ -1199,10 +1263,19 @@
         if (selectedIndex < 0 || !jsonData) return;
         const nextOrder = Number.parseInt(event.target.value, 10);
         if (!Number.isFinite(nextOrder)) return;
+        logOrderEvent("manual-order-change", {
+          index: selectedIndex,
+          previousOrder: jsonData.items[selectedIndex].order,
+          nextOrder,
+        });
         jsonData.items[selectedIndex].order = nextOrder;
         normalizeBubbleOrders(jsonData);
         bubbleOrder.value = jsonData.items[selectedIndex].order;
         renderBubbleList();
+        logOrderEvent("manual-order-change-complete", {
+          index: selectedIndex,
+          updatedOrder: jsonData.items[selectedIndex].order,
+        });
       });
 
       bubbleType.addEventListener("change", (event) => {
