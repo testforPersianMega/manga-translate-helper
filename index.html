@@ -953,8 +953,71 @@
         return bbox.x_min + (bbox.x_max - bbox.x_min) / 2;
       };
 
-      const getAutoPriorityBubbleIndices = (jsonData) =>
-        getOrderedBubbleIndices(jsonData);
+      const areBboxesOverlapping = (bboxA, bboxB) => {
+        if (!bboxA || !bboxB) return false;
+        const xOverlap =
+          Math.min(bboxA.x_max, bboxB.x_max) -
+          Math.max(bboxA.x_min, bboxB.x_min);
+        const yOverlap =
+          Math.min(bboxA.y_max, bboxB.y_max) -
+          Math.max(bboxA.y_min, bboxB.y_min);
+        return xOverlap > 0 && yOverlap > 0;
+      };
+
+      const getOverlappingBubbleIndices = (jsonData, currentIndex) => {
+        if (!jsonData?.items?.length || currentIndex < 0) return [];
+        const currentItem = jsonData.items[currentIndex];
+        const currentBbox = getItemBbox(currentItem);
+        if (!currentBbox) return [];
+        const currentXCenter = getBubbleXCenter(currentItem);
+        return jsonData.items
+          .map((item, index) => {
+            if (index === currentIndex) return null;
+            const bbox = getItemBbox(item);
+            if (!areBboxesOverlapping(currentBbox, bbox)) return null;
+            return {
+              index,
+              distance: Math.abs(getBubbleXCenter(item) - currentXCenter),
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (a.distance !== b.distance) {
+              return a.distance - b.distance;
+            }
+            return a.index - b.index;
+          })
+          .map((entry) => entry.index);
+      };
+
+      const getAutoPriorityBubbleIndices = (jsonData, currentIndex) => {
+        const orderedIndices = getOrderedBubbleIndices(jsonData);
+        if (!orderedIndices.length || currentIndex < 0) {
+          return orderedIndices;
+        }
+        const currentPosition = orderedIndices.indexOf(currentIndex);
+        if (currentPosition === -1) return orderedIndices;
+        const overlappingIndices = getOverlappingBubbleIndices(
+          jsonData,
+          currentIndex,
+        );
+        if (!overlappingIndices.length) {
+          return orderedIndices;
+        }
+        const overlapSet = new Set(overlappingIndices);
+        const beforeCurrent = orderedIndices
+          .slice(0, currentPosition)
+          .filter((index) => !overlapSet.has(index));
+        const afterCurrent = orderedIndices
+          .slice(currentPosition + 1)
+          .filter((index) => !overlapSet.has(index));
+        return [
+          ...beforeCurrent,
+          currentIndex,
+          ...overlappingIndices,
+          ...afterCurrent,
+        ];
+      };
 
       const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
         const orderedIndices = getOrderedBubbleIndices(jsonData);
@@ -1853,7 +1916,10 @@
         if (!jsonData?.items?.length) return;
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(jsonData);
+          const orderedIndices = getAutoPriorityBubbleIndices(
+            jsonData,
+            selectedIndex,
+          );
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const nextPosition = currentPosition === -1 ? 0 : currentPosition + 1;
           const nextIndex =
@@ -1866,7 +1932,10 @@
         }
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(jsonData);
+          const orderedIndices = getAutoPriorityBubbleIndices(
+            jsonData,
+            selectedIndex,
+          );
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const previousPosition =
             currentPosition === -1
