@@ -775,8 +775,7 @@
 
       const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-      const getItemBbox = (item) =>
-        item.bbox_bubble ?? item.bbox_text ?? null;
+      const getItemBbox = (item) => item.bbox_bubble ?? item.bbox_text ?? null;
 
       const RIGHT_PRIORITY_WEIGHT = 1.1;
 
@@ -907,8 +906,10 @@
           if (orderA !== orderB) {
             return orderA - orderB;
           }
-          return (rowRank.get(a.index) ?? a.index) -
-            (rowRank.get(b.index) ?? b.index);
+          return (
+            (rowRank.get(a.index) ?? a.index) -
+            (rowRank.get(b.index) ?? b.index)
+          );
         });
         entries.forEach((entry, position) => {
           jsonData.items[entry.index].order = position + 1;
@@ -960,8 +961,7 @@
         if (!orderedIndices.length) return -1;
         if (currentIndex < 0) return orderedIndices[0];
         const currentPosition = orderedIndices.indexOf(currentIndex);
-        const startPosition =
-          currentPosition === -1 ? 0 : currentPosition + 1;
+        const startPosition = currentPosition === -1 ? 0 : currentPosition + 1;
         if (startPosition >= orderedIndices.length) {
           return orderedIndices[orderedIndices.length - 1];
         }
@@ -1851,12 +1851,11 @@
         }
         const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
-        if (event.key === "ArrowRight") {
+        if (event.key === "ArrowLeft") {
           event.preventDefault();
           const orderedIndices = getAutoPriorityBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
-          const nextPosition =
-            currentPosition === -1 ? 0 : currentPosition + 1;
+          const nextPosition = currentPosition === -1 ? 0 : currentPosition + 1;
           const nextIndex =
             orderedIndices[
               nextPosition >= orderedIndices.length ? 0 : nextPosition
@@ -1865,7 +1864,7 @@
             selectBubble(nextIndex);
           }
         }
-        if (event.key === "ArrowLeft") {
+        if (event.key === "ArrowRight") {
           event.preventDefault();
           const orderedIndices = getAutoPriorityBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
