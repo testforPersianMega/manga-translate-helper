@@ -116,6 +116,35 @@
         border-radius: 8px;
       }
 
+      .bubble-list-item {
+        display: flex;
+        align-items: stretch;
+        border-bottom: 1px solid var(--border);
+        background: transparent;
+      }
+
+      .bubble-list-item.drag-over {
+        background: var(--accent-soft);
+      }
+
+      .bubble-list-item.dragging {
+        opacity: 0.6;
+      }
+
+      .bubble-drag-handle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 10px;
+        cursor: grab;
+        color: var(--muted);
+        user-select: none;
+      }
+
+      .bubble-drag-handle:active {
+        cursor: grabbing;
+      }
+
       .page-list {
         max-height: 220px;
         overflow: auto;
@@ -159,7 +188,6 @@
         text-align: left;
         padding: 8px 12px;
         border: none;
-        border-bottom: 1px solid var(--border);
         background: transparent;
         cursor: pointer;
         font-size: 14px;
@@ -406,6 +434,31 @@
         font-size: 14px;
       }
 
+      .manual-order-alert {
+        margin-top: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        color: #92400e;
+        font-size: 13px;
+      }
+
+      .action-button {
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .action-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 1100px) {
         main {
           grid-template-columns: 180px minmax(0, 1fr) 280px;
@@ -542,6 +595,14 @@
             <input id="bubbleOrder" type="number" min="1" step="1" />
           </div>
           <div class="field">
+            <button type="button" id="autoOrderBtn" class="action-button">
+              Auto Order Bubbles
+            </button>
+            <div id="manualOrderNotice" class="manual-order-alert" hidden>
+              Order was changed manually. Use auto order to reset.
+            </div>
+          </div>
+          <div class="field">
             <label>Original Text</label>
             <textarea id="bubbleOriginal" readonly></textarea>
           </div>
@@ -604,6 +665,8 @@
       const bubbleOriginal = document.getElementById("bubbleOriginal");
       const bubbleText = document.getElementById("bubbleText");
       const bubbleType = document.getElementById("bubbleType");
+      const autoOrderBtn = document.getElementById("autoOrderBtn");
+      const manualOrderNotice = document.getElementById("manualOrderNotice");
       const autoPanToggle = document.getElementById("autoPanToggle");
       const bubbleMarginInput = document.getElementById("bubbleMarginInput");
       const zoomOutBtn = document.getElementById("zoomOutBtn");
@@ -726,6 +789,10 @@
         const hasJson = Boolean(getCurrentJson());
         addBubbleBtn.disabled = !hasJson;
         removeBubbleBtn.disabled = !hasJson || selectedIndex < 0;
+        autoOrderBtn.disabled = !hasJson;
+        if (!hasJson) {
+          manualOrderNotice.hidden = true;
+        }
         if (!hasJson && isDrawingBubble) {
           setDrawingMode(false);
         }
@@ -995,6 +1062,14 @@
         logOrderEvent("ensure-orders-present", { hasMissing });
       };
 
+      const setManualOrderNotice = (isManual) => {
+        manualOrderNotice.hidden = !isManual;
+        const page = getCurrentPage();
+        if (page) {
+          page.manualOrderChanged = isManual;
+        }
+      };
+
       const getOrderedBubbleIndices = (jsonData) => {
         ensureBubbleOrders(jsonData);
         const entries = jsonData.items.map((item, index) => ({
@@ -1160,6 +1235,27 @@
         });
       };
 
+      const reorderBubbleToPosition = (
+        jsonData,
+        fromIndex,
+        targetPosition,
+        source,
+      ) => {
+        if (!jsonData?.items?.length) return;
+        const orderedIndices = getOrderedBubbleIndices(jsonData);
+        const currentPosition = orderedIndices.indexOf(fromIndex);
+        if (currentPosition === -1) return;
+        const clampedPosition = clamp(
+          targetPosition,
+          0,
+          orderedIndices.length - 1,
+        );
+        if (currentPosition === clampedPosition) return;
+        orderedIndices.splice(currentPosition, 1);
+        orderedIndices.splice(clampedPosition, 0, fromIndex);
+        updateOrdersFromIndices(jsonData, orderedIndices, source);
+      };
+
       const applyOverlapOrderingIfNeeded = (
         jsonData,
         currentIndex,
@@ -1196,6 +1292,12 @@
         jsonData.items.forEach((_, index) => {
           applyOverlapOrderingIfNeeded(jsonData, index, "forward");
         });
+      };
+
+      const autoOrderBubbles = (jsonData) => {
+        if (!jsonData?.items?.length) return;
+        normalizeBubbleOrders(jsonData);
+        applyInitialOverlapOrdering(jsonData);
       };
 
       const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
@@ -1287,6 +1389,14 @@
         const orderedIndices = getOrderedBubbleIndices(jsonData);
         orderedIndices.forEach((index) => {
           const item = jsonData.items[index];
+          const row = document.createElement("div");
+          row.className = "bubble-list-item";
+          row.dataset.index = String(index);
+          const handle = document.createElement("div");
+          handle.className = "bubble-drag-handle";
+          handle.textContent = "⋮⋮";
+          handle.title = "Drag to reorder";
+          handle.draggable = true;
           const button = document.createElement("button");
           button.type = "button";
           const orderLabel = Number.isFinite(Number(item.order))
@@ -1297,7 +1407,48 @@
           if (index === selectedIndex) {
             button.classList.add("active");
           }
-          bubbleList.appendChild(button);
+          handle.addEventListener("dragstart", (event) => {
+            row.classList.add("dragging");
+            event.dataTransfer.setData("text/plain", String(index));
+            event.dataTransfer.effectAllowed = "move";
+          });
+          handle.addEventListener("dragend", () => {
+            row.classList.remove("dragging");
+          });
+          row.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            row.classList.add("drag-over");
+            event.dataTransfer.dropEffect = "move";
+          });
+          row.addEventListener("dragleave", () => {
+            row.classList.remove("drag-over");
+          });
+          row.addEventListener("drop", (event) => {
+            event.preventDefault();
+            row.classList.remove("drag-over");
+            const data = event.dataTransfer.getData("text/plain");
+            const fromIndex = Number.parseInt(data, 10);
+            if (!Number.isFinite(fromIndex)) return;
+            const jsonData = getCurrentJson();
+            if (!jsonData) return;
+            const orderedIndices = getOrderedBubbleIndices(jsonData);
+            const targetPosition = orderedIndices.indexOf(index);
+            if (targetPosition === -1 || fromIndex === index) return;
+            reorderBubbleToPosition(
+              jsonData,
+              fromIndex,
+              targetPosition,
+              "drag-reorder",
+            );
+            setManualOrderNotice(true);
+            renderBubbleList();
+            if (selectedIndex >= 0) {
+              bubbleOrder.value = jsonData.items[selectedIndex].order ?? "";
+            }
+          });
+          row.appendChild(handle);
+          row.appendChild(button);
+          bubbleList.appendChild(row);
         });
       };
 
@@ -1350,7 +1501,6 @@
         if (!jsonData?.items?.length) return;
         ensureBubbleOrders(jsonData);
         const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
-        applyOverlapOrderingIfNeeded(jsonData, clamped, "forward");
         selectedIndex = clamped;
         const item = jsonData.items[clamped];
         normalizeItem(item);
@@ -1379,13 +1529,19 @@
         if (selectedIndex < 0 || !jsonData) return;
         const nextOrder = Number.parseInt(event.target.value, 10);
         if (!Number.isFinite(nextOrder)) return;
+        const clampedOrder = clamp(nextOrder, 1, jsonData.items.length);
         logOrderEvent("manual-order-change", {
           index: selectedIndex,
           previousOrder: jsonData.items[selectedIndex].order,
-          nextOrder,
+          nextOrder: clampedOrder,
         });
-        jsonData.items[selectedIndex].order = nextOrder;
-        normalizeBubbleOrders(jsonData);
+        reorderBubbleToPosition(
+          jsonData,
+          selectedIndex,
+          clampedOrder - 1,
+          "manual-input",
+        );
+        setManualOrderNotice(true);
         bubbleOrder.value = jsonData.items[selectedIndex].order;
         renderBubbleList();
         logOrderEvent("manual-order-change-complete", {
@@ -1398,6 +1554,17 @@
         const jsonData = getCurrentJson();
         if (selectedIndex < 0 || !jsonData) return;
         jsonData.items[selectedIndex].bubble_type = event.target.value;
+      });
+
+      autoOrderBtn.addEventListener("click", () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        autoOrderBubbles(page.jsonData);
+        setManualOrderNotice(false);
+        renderBubbleList();
+        if (selectedIndex >= 0) {
+          bubbleOrder.value = page.jsonData.items[selectedIndex].order ?? "";
+        }
       });
 
       const updateBubbleMarginValue = (value) => {
@@ -1430,6 +1597,7 @@
             page.overlapOrdered = true;
           }
         }
+        setManualOrderNotice(Boolean(page?.manualOrderChanged));
         if (page?.imageUrl) {
           mainImage.src = page.imageUrl;
           imagePlaceholder.style.display = "none";
@@ -1480,6 +1648,7 @@
               jsonData: null,
               jsonName: "",
               overlapOrdered: false,
+              manualOrderChanged: false,
             });
           }
           if (currentPageIndex === -1 && index === 0) {
@@ -1527,6 +1696,7 @@
                 existing.jsonData = data;
                 existing.jsonName = file.name;
                 existing.overlapOrdered = false;
+                existing.manualOrderChanged = false;
               } else {
                 pages.push({
                   id: crypto.randomUUID(),
@@ -1537,6 +1707,7 @@
                   jsonData: data,
                   jsonName: file.name,
                   overlapOrdered: false,
+                  manualOrderChanged: false,
                 });
               }
             } catch (err) {
@@ -2206,11 +2377,7 @@
         if (!jsonData?.items?.length) return;
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          const orderedIndices = applyOverlapOrderingIfNeeded(
-            jsonData,
-            selectedIndex,
-            "forward",
-          );
+          const orderedIndices = getOrderedBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const nextPosition = currentPosition === -1 ? 0 : currentPosition + 1;
           const nextIndex =
@@ -2224,11 +2391,7 @@
         }
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          const orderedIndices = applyOverlapOrderingIfNeeded(
-            jsonData,
-            selectedIndex,
-            "backward",
-          );
+          const orderedIndices = getOrderedBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const previousPosition =
             currentPosition === -1
