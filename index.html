@@ -1044,7 +1044,7 @@
         return overlapping;
       };
 
-      const getAutoPriorityBubbleIndices = (
+      const getOverlapPriorityBubbleIndices = (
         jsonData,
         currentIndex,
         direction = "forward",
@@ -1122,6 +1122,48 @@
           direction,
           prioritized,
         });
+        return prioritized;
+      };
+
+      const updateOrdersFromIndices = (jsonData, orderedIndices, source) => {
+        orderedIndices.forEach((index, position) => {
+          jsonData.items[index].order = position + 1;
+        });
+        logOrderEvent("order-update", {
+          source,
+          orderedIndices,
+          finalOrders: jsonData.items.map((item) => item.order),
+        });
+      };
+
+      const applyOverlapOrderingIfNeeded = (
+        jsonData,
+        currentIndex,
+        direction = "forward",
+      ) => {
+        const orderedIndices = getOrderedBubbleIndices(jsonData);
+        if (!orderedIndices.length) {
+          return orderedIndices;
+        }
+        const targetIndex =
+          currentIndex < 0 ? orderedIndices[0] : currentIndex;
+        const prioritized = getOverlapPriorityBubbleIndices(
+          jsonData,
+          targetIndex,
+          direction,
+        );
+        if (prioritized.length === orderedIndices.length) {
+          const changed = prioritized.some(
+            (index, position) => orderedIndices[position] !== index,
+          );
+          if (changed) {
+            updateOrdersFromIndices(
+              jsonData,
+              prioritized,
+              "overlap-priority",
+            );
+          }
+        }
         return prioritized;
       };
 
@@ -1277,6 +1319,7 @@
         if (!jsonData?.items?.length) return;
         ensureBubbleOrders(jsonData);
         const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
+        applyOverlapOrderingIfNeeded(jsonData, clamped, "forward");
         selectedIndex = clamped;
         const item = jsonData.items[clamped];
         normalizeItem(item);
@@ -2031,7 +2074,7 @@
         if (!jsonData?.items?.length) return;
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(
+          const orderedIndices = applyOverlapOrderingIfNeeded(
             jsonData,
             selectedIndex,
             "forward",
@@ -2048,7 +2091,7 @@
         }
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(
+          const orderedIndices = applyOverlapOrderingIfNeeded(
             jsonData,
             selectedIndex,
             "backward",
