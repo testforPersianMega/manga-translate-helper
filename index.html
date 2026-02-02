@@ -815,65 +815,34 @@
         if (!withBbox.length) {
           return entries.map((entry) => entry.index);
         }
-        const heights = withBbox
-          .map((entry) => entry.height)
-          .sort((a, b) => a - b);
-        const widths = withBbox
-          .map((entry) => entry.width)
-          .sort((a, b) => a - b);
-        const medianHeight =
-          heights[Math.floor(heights.length / 2)] ?? MIN_BBOX_SIZE;
-        const medianWidth =
-          widths[Math.floor(widths.length / 2)] ?? MIN_BBOX_SIZE;
-        const rowTolerance = Math.max(8, medianHeight * 0.6);
-        const columnTolerance = Math.max(12, medianWidth * 0.25);
-        withBbox.sort((a, b) => {
-          if (a.yMin !== b.yMin) {
-            return a.yMin - b.yMin;
+        const anchor = withBbox.reduce((best, entry) => {
+          if (!best) return entry;
+          if (entry.yMin !== best.yMin) {
+            return entry.yMin < best.yMin ? entry : best;
           }
-          if (a.xCenter !== b.xCenter) {
-            return b.xCenter - a.xCenter;
+          if (entry.xCenter !== best.xCenter) {
+            return entry.xCenter > best.xCenter ? entry : best;
           }
-          return a.index - b.index;
-        });
-        const rows = [];
-        withBbox.forEach((entry) => {
-          const row = rows.at(-1);
-          if (!row) {
-            rows.push({
-              top: entry.yMin,
-              bottom: entry.yMax,
-              entries: [entry],
-            });
-            return;
-          }
-          if (entry.yMin <= row.bottom + rowTolerance) {
-            row.entries.push(entry);
-            row.top = Math.min(row.top, entry.yMin);
-            row.bottom = Math.max(row.bottom, entry.yMax);
-            return;
-          }
-          rows.push({
-            top: entry.yMin,
-            bottom: entry.yMax,
-            entries: [entry],
-          });
-        });
-        rows.forEach((row) => {
-          row.entries.sort((a, b) => {
-            const xDelta = b.xCenter - a.xCenter;
-            if (Math.abs(xDelta) > columnTolerance) {
-              return xDelta;
+          return entry.index < best.index ? entry : best;
+        }, null);
+        const anchorCenter = anchor?.yCenter ?? Number.POSITIVE_INFINITY;
+        const ordered = withBbox
+          .slice()
+          .sort((a, b) => {
+            const distanceA = Math.abs(a.yCenter - anchorCenter);
+            const distanceB = Math.abs(b.yCenter - anchorCenter);
+            if (distanceA !== distanceB) {
+              return distanceA - distanceB;
             }
             if (a.yMin !== b.yMin) {
               return a.yMin - b.yMin;
             }
+            if (a.xCenter !== b.xCenter) {
+              return b.xCenter - a.xCenter;
+            }
             return a.index - b.index;
-          });
-        });
-        const ordered = rows.flatMap((row) =>
-          row.entries.map((entry) => entry.index),
-        );
+          })
+          .map((entry) => entry.index);
         return ordered.concat(withoutBbox.map((entry) => entry.index));
       };
 
