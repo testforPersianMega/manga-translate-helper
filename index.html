@@ -957,6 +957,41 @@
         return entries.map((entry) => entry.index);
       };
 
+      const getBubbleXCenter = (item) => {
+        const bbox = getItemBbox(item);
+        if (!bbox) return Number.POSITIVE_INFINITY;
+        return bbox.x_min + (bbox.x_max - bbox.x_min) / 2;
+      };
+
+      const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
+        const orderedIndices = getOrderedBubbleIndices(jsonData);
+        if (!orderedIndices.length) return -1;
+        if (currentIndex < 0) return orderedIndices[0];
+        const currentPosition = orderedIndices.indexOf(currentIndex);
+        const startPosition =
+          currentPosition === -1 ? 0 : currentPosition + 1;
+        if (startPosition >= orderedIndices.length) {
+          return orderedIndices[orderedIndices.length - 1];
+        }
+        const currentItem = jsonData.items[currentIndex];
+        const currentCenter = getBubbleXCenter(currentItem);
+        if (!Number.isFinite(currentCenter)) {
+          return orderedIndices[startPosition];
+        }
+        let bestIndex = orderedIndices[startPosition];
+        let bestDistance = Number.POSITIVE_INFINITY;
+        orderedIndices.slice(startPosition).forEach((index) => {
+          const candidate = jsonData.items[index];
+          const candidateCenter = getBubbleXCenter(candidate);
+          const distance = Math.abs(candidateCenter - currentCenter);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = index;
+          }
+        });
+        return bestIndex;
+      };
+
       const normalizeItem = (item) => {
         if (!item) return;
         if (typeof item.text !== "string") {
@@ -1820,23 +1855,21 @@
           event.preventDefault();
           const orderedIndices = getOrderedBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
-          const nextPosition =
-            currentPosition === -1 ? 0 : currentPosition + 1;
-          const nextIndex =
-            orderedIndices[Math.min(nextPosition, orderedIndices.length - 1)];
-          if (nextIndex !== undefined) {
-            selectBubble(nextIndex);
+          const previousPosition =
+            currentPosition === -1 ? 0 : currentPosition - 1;
+          const previousIndex =
+            orderedIndices[Math.max(0, previousPosition)];
+          if (previousIndex !== undefined) {
+            selectBubble(previousIndex);
           }
         }
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          const orderedIndices = getOrderedBubbleIndices(jsonData);
-          const currentPosition = orderedIndices.indexOf(selectedIndex);
-          const nextPosition =
-            currentPosition === -1 ? 0 : currentPosition - 1;
-          const nextIndex =
-            orderedIndices[Math.max(0, nextPosition)];
-          if (nextIndex !== undefined) {
+          const nextIndex = getNextBubbleIndexByCenter(
+            jsonData,
+            selectedIndex,
+          );
+          if (nextIndex !== undefined && nextIndex !== -1) {
             selectBubble(nextIndex);
           }
         }
