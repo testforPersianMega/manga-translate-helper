@@ -791,6 +791,17 @@
         a.yMin <= b.yMax &&
         a.yMax >= b.yMin;
 
+      const getOverlapArea = (a, b) => {
+        if (!a || !b) return 0;
+        const xMin = Math.max(a.x_min, b.x_min);
+        const xMax = Math.min(a.x_max, b.x_max);
+        const yMin = Math.max(a.y_min, b.y_min);
+        const yMax = Math.min(a.y_max, b.y_max);
+        const width = Math.max(0, xMax - xMin);
+        const height = Math.max(0, yMax - yMin);
+        return width * height;
+      };
+
       const getRowBasedBubbleIndices = (jsonData) => {
         const entries = jsonData.items.map((item, index) => {
           const bbox = getItemBbox(item);
@@ -959,7 +970,6 @@
         const currentItem = jsonData.items[currentIndex];
         const currentBbox = getItemBbox(currentItem);
         if (!currentBbox) return orderedIndices;
-        const currentCenter = getBubbleXCenter(currentItem);
         const overlapCandidates = orderedIndices.filter((index) => {
           if (index === currentIndex) return false;
           const candidateBbox = getItemBbox(jsonData.items[index]);
@@ -968,12 +978,16 @@
         if (!overlapCandidates.length) return orderedIndices;
         const overlapSet = new Set(overlapCandidates);
         overlapCandidates.sort((a, b) => {
-          const centerA = getBubbleXCenter(jsonData.items[a]);
-          const centerB = getBubbleXCenter(jsonData.items[b]);
-          const distanceA = Math.abs(centerA - currentCenter);
-          const distanceB = Math.abs(centerB - currentCenter);
-          if (distanceA !== distanceB) {
-            return distanceA - distanceB;
+          const overlapA = getOverlapArea(
+            currentBbox,
+            getItemBbox(jsonData.items[a]),
+          );
+          const overlapB = getOverlapArea(
+            currentBbox,
+            getItemBbox(jsonData.items[b]),
+          );
+          if (overlapA !== overlapB) {
+            return overlapB - overlapA;
           }
           return orderedIndices.indexOf(a) - orderedIndices.indexOf(b);
         });
