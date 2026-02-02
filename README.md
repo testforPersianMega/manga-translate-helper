@@ -14,8 +14,8 @@ This is a single-page helper for reviewing manga bubble detection JSON alongside
 | Action | Shortcut |
 | --- | --- |
 | Save current JSON | `Ctrl/Cmd + S` |
-| Next bubble | `Arrow Down` |
-| Previous bubble | `Arrow Up` |
+| Next bubble | `Arrow Right` |
+| Previous bubble | `Arrow Left` |
 | Zoom in | `+` or `=` |
 | Zoom out | `-` |
 | Reset zoom/position | `0` |
@@ -24,6 +24,8 @@ This is a single-page helper for reviewing manga bubble detection JSON alongside
 | Pan image right | `Shift + Arrow Right` |
 | Pan image up | `Shift + Arrow Up` |
 | Pan image down | `Shift + Arrow Down` |
+
+Bubble navigation follows the bubble bounding boxes (`bbox_bubble` or `bbox_text`) from left to right.
 
 ## Usage
 

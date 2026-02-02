@@ -767,6 +767,33 @@
         overlayLayer.innerHTML = "";
       };
 
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const getItemBbox = (item) =>
+        item.bbox_bubble ?? item.bbox_text ?? null;
+
+      const getOrderedBubbleIndices = (jsonData) => {
+        const entries = jsonData.items.map((item, index) => ({
+          index,
+          bbox: getItemBbox(item),
+        }));
+        entries.sort((a, b) => {
+          if (!a.bbox && !b.bbox) {
+            return a.index - b.index;
+          }
+          if (!a.bbox) return 1;
+          if (!b.bbox) return -1;
+          if (a.bbox.x_min !== b.bbox.x_min) {
+            return a.bbox.x_min - b.bbox.x_min;
+          }
+          if (a.bbox.y_min !== b.bbox.y_min) {
+            return a.bbox.y_min - b.bbox.y_min;
+          }
+          return a.index - b.index;
+        });
+        return entries.map((entry) => entry.index);
+      };
+
       const normalizeItem = (item) => {
         if (!item) return;
         if (typeof item.text !== "string") {
@@ -825,7 +852,9 @@
             '<div class="placeholder" style="padding: 12px;">No bubbles loaded.</div>';
           return;
         }
-        jsonData.items.forEach((item, index) => {
+        const orderedIndices = getOrderedBubbleIndices(jsonData);
+        orderedIndices.forEach((index) => {
+          const item = jsonData.items[index];
           const button = document.createElement("button");
           button.type = "button";
           button.textContent = `#${item.id ?? index + 1}`;
@@ -1127,11 +1156,6 @@
           y: localY / scale.heightScale,
         };
       };
-
-      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-
-      const getItemBbox = (item) =>
-        item.bbox_bubble ?? item.bbox_text ?? null;
 
       const setItemBbox = (item, bbox) => {
         item.bbox_bubble = { ...bbox };
@@ -1606,13 +1630,29 @@
         }
         const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
-        if (event.key === "ArrowDown") {
+        if (event.key === "ArrowRight") {
           event.preventDefault();
-          selectBubble(selectedIndex + 1);
+          const orderedIndices = getOrderedBubbleIndices(jsonData);
+          const currentPosition = orderedIndices.indexOf(selectedIndex);
+          const nextPosition =
+            currentPosition === -1 ? 0 : currentPosition + 1;
+          const nextIndex =
+            orderedIndices[Math.min(nextPosition, orderedIndices.length - 1)];
+          if (nextIndex !== undefined) {
+            selectBubble(nextIndex);
+          }
         }
-        if (event.key === "ArrowUp") {
+        if (event.key === "ArrowLeft") {
           event.preventDefault();
-          selectBubble(selectedIndex - 1);
+          const orderedIndices = getOrderedBubbleIndices(jsonData);
+          const currentPosition = orderedIndices.indexOf(selectedIndex);
+          const nextPosition =
+            currentPosition === -1 ? 0 : currentPosition - 1;
+          const nextIndex =
+            orderedIndices[Math.max(0, nextPosition)];
+          if (nextIndex !== undefined) {
+            selectBubble(nextIndex);
+          }
         }
       });
 
