@@ -1133,6 +1133,143 @@
       const getItemBbox = (item) =>
         item.bbox_bubble ?? item.bbox_text ?? null;
 
+      const PRIMARY_AXIS_WEIGHT = 1;
+      const SECONDARY_AXIS_WEIGHT = 0.35;
+      const DIRECTION_CONE_RATIO = 0.75;
+      const ROW_TOLERANCE_MIN = 8;
+      const ROW_TOLERANCE_FACTOR = 0.6;
+
+      const getBubbleGeometry = (jsonData) =>
+        jsonData.items
+          .map((item, index) => {
+            const bbox = getItemBbox(item);
+            if (!bbox) return null;
+            const width = bbox.x_max - bbox.x_min;
+            const height = bbox.y_max - bbox.y_min;
+            return {
+              index,
+              bbox,
+              cx: bbox.x_min + width / 2,
+              cy: bbox.y_min + height / 2,
+              width,
+              height,
+            };
+          })
+          .filter(Boolean);
+
+      const getRowTolerance = (bubbles) => {
+        if (!bubbles.length) return ROW_TOLERANCE_MIN;
+        const averageHeight =
+          bubbles.reduce((total, bubble) => total + bubble.height, 0) /
+          bubbles.length;
+        return Math.max(ROW_TOLERANCE_MIN, averageHeight * ROW_TOLERANCE_FACTOR);
+      };
+
+      const getBubbleRows = (bubbles) => {
+        const rows = [];
+        const rowMap = new Map();
+        const rowTolerance = getRowTolerance(bubbles);
+        const sorted = [...bubbles].sort((a, b) => a.cy - b.cy);
+        sorted.forEach((bubble) => {
+          let row = rows.find(
+            (candidate) => Math.abs(bubble.cy - candidate.cy) <= rowTolerance,
+          );
+          if (!row) {
+            row = { cy: bubble.cy, items: [] };
+            rows.push(row);
+          }
+          row.items.push(bubble);
+          row.cy =
+            row.items.reduce((total, item) => total + item.cy, 0) /
+            row.items.length;
+        });
+        rows.sort((a, b) => a.cy - b.cy);
+        rows.forEach((row, rowIndex) => {
+          row.items.sort((a, b) => a.cx - b.cx);
+          row.items.forEach((item) => rowMap.set(item.index, rowIndex));
+        });
+        return { rows, rowMap };
+      };
+
+      const getDirectionalScore = (dx, dy, direction) => {
+        const primary =
+          direction === "up" || direction === "down" ? Math.abs(dy) : Math.abs(dx);
+        const secondary =
+          direction === "up" || direction === "down" ? Math.abs(dx) : Math.abs(dy);
+        return primary * PRIMARY_AXIS_WEIGHT + secondary * SECONDARY_AXIS_WEIGHT;
+      };
+
+      const isWithinCone = (dx, dy, direction) => {
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+        if (direction === "up" || direction === "down") {
+          return absDx <= absDy * DIRECTION_CONE_RATIO;
+        }
+        return absDy <= absDx * DIRECTION_CONE_RATIO;
+      };
+
+      const pickDirectionalCandidate = (direction, current, candidates) => {
+        if (!candidates.length) return null;
+        const coneCandidates = candidates.filter((candidate) =>
+          isWithinCone(
+            candidate.cx - current.cx,
+            candidate.cy - current.cy,
+            direction,
+          ),
+        );
+        const pool = coneCandidates.length ? coneCandidates : candidates;
+        let bestCandidate = null;
+        let bestScore = Number.POSITIVE_INFINITY;
+        pool.forEach((candidate) => {
+          const dx = candidate.cx - current.cx;
+          const dy = candidate.cy - current.cy;
+          const score = getDirectionalScore(dx, dy, direction);
+          if (score < bestScore) {
+            bestScore = score;
+            bestCandidate = candidate;
+          }
+        });
+        return bestCandidate?.index ?? null;
+      };
+
+      const findNextBubbleIndex = (direction) => {
+        const jsonData = getCurrentJson();
+        if (!jsonData?.items?.length) return null;
+        if (selectedIndex < 0) return 0;
+        const bubbles = getBubbleGeometry(jsonData);
+        const current = bubbles.find((bubble) => bubble.index === selectedIndex);
+        if (!current) return null;
+        const filterByDirection = (bubble) => {
+          if (bubble.index === current.index) return false;
+          if (direction === "up") return bubble.cy < current.cy;
+          if (direction === "down") return bubble.cy > current.cy;
+          if (direction === "left") return bubble.cx < current.cx;
+          return bubble.cx > current.cx;
+        };
+        if (direction === "left" || direction === "right") {
+          const { rows, rowMap } = getBubbleRows(bubbles);
+          const rowIndex = rowMap.get(current.index);
+          if (rowIndex !== undefined) {
+            const row = rows[rowIndex];
+            const rowCandidates = row.items.filter(filterByDirection);
+            if (rowCandidates.length) {
+              return pickDirectionalCandidate(direction, current, rowCandidates);
+            }
+            const wrapRow =
+              direction === "left" ? rows[rowIndex - 1] : rows[rowIndex + 1];
+            if (wrapRow?.items?.length) {
+              const wrapTarget =
+                direction === "left"
+                  ? wrapRow.items.at(-1)
+                  : wrapRow.items.at(0);
+              return wrapTarget?.index ?? null;
+            }
+          }
+        }
+        const candidates = bubbles.filter(filterByDirection);
+        return pickDirectionalCandidate(direction, current, candidates);
+      };
+
       const setItemBbox = (item, bbox) => {
         item.bbox_bubble = { ...bbox };
       };
@@ -1608,11 +1745,23 @@
         if (!jsonData?.items?.length) return;
         if (event.key === "ArrowDown") {
           event.preventDefault();
-          selectBubble(selectedIndex + 1);
+          const nextIndex = findNextBubbleIndex("down");
+          if (nextIndex !== null) selectBubble(nextIndex);
         }
         if (event.key === "ArrowUp") {
           event.preventDefault();
-          selectBubble(selectedIndex - 1);
+          const nextIndex = findNextBubbleIndex("up");
+          if (nextIndex !== null) selectBubble(nextIndex);
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          const nextIndex = findNextBubbleIndex("left");
+          if (nextIndex !== null) selectBubble(nextIndex);
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          const nextIndex = findNextBubbleIndex("right");
+          if (nextIndex !== null) selectBubble(nextIndex);
         }
       });
 
