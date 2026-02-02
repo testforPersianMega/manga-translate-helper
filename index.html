@@ -1167,6 +1167,13 @@
         return prioritized;
       };
 
+      const applyInitialOverlapOrdering = (jsonData) => {
+        if (!jsonData?.items?.length) return;
+        jsonData.items.forEach((_, index) => {
+          applyOverlapOrderingIfNeeded(jsonData, index, "forward");
+        });
+      };
+
       const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
         const orderedIndices = getOrderedBubbleIndices(jsonData);
         if (!orderedIndices.length) return -1;
@@ -1376,6 +1383,10 @@
         const page = getCurrentPage();
         if (page?.jsonData) {
           ensureBubbleOrders(page.jsonData);
+          if (!page.overlapOrdered) {
+            applyInitialOverlapOrdering(page.jsonData);
+            page.overlapOrdered = true;
+          }
         }
         if (page?.imageUrl) {
           mainImage.src = page.imageUrl;
@@ -1426,6 +1437,7 @@
               imageName: file.name,
               jsonData: null,
               jsonName: "",
+              overlapOrdered: false,
             });
           }
           if (currentPageIndex === -1 && index === 0) {
@@ -1472,6 +1484,7 @@
               if (existing) {
                 existing.jsonData = data;
                 existing.jsonName = file.name;
+                existing.overlapOrdered = false;
               } else {
                 pages.push({
                   id: crypto.randomUUID(),
@@ -1481,6 +1494,7 @@
                   imageName: "",
                   jsonData: data,
                   jsonName: file.name,
+                  overlapOrdered: false,
                 });
               }
             } catch (err) {
