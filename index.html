@@ -1009,6 +1009,10 @@
 
       const getAutoPriorityBubbleIndices = (jsonData, currentIndex) => {
         const orderedIndices = getOrderedBubbleIndices(jsonData);
+        const rowOrder = getRowBasedBubbleIndices(jsonData);
+        const rowRank = new Map(
+          rowOrder.map((index, position) => [index, position]),
+        );
         if (currentIndex < 0) return orderedIndices;
         const currentPosition = orderedIndices.indexOf(currentIndex);
         if (currentPosition === -1) return orderedIndices;
@@ -1044,6 +1048,11 @@
           });
           if (overlapA !== overlapB) {
             return overlapB - overlapA;
+          }
+          const rowA = rowRank.get(a) ?? orderedIndices.indexOf(a);
+          const rowB = rowRank.get(b) ?? orderedIndices.indexOf(b);
+          if (rowA !== rowB) {
+            return rowA - rowB;
           }
           return orderedIndices.indexOf(a) - orderedIndices.indexOf(b);
         });
@@ -1967,6 +1976,23 @@
             selectedIndex,
           );
           const currentPosition = orderedIndices.indexOf(selectedIndex);
+          const nextPosition =
+            currentPosition === -1 ? 0 : currentPosition + 1;
+          const nextIndex =
+            orderedIndices[
+              nextPosition >= orderedIndices.length ? 0 : nextPosition
+            ];
+          if (nextIndex !== undefined) {
+            selectBubble(nextIndex);
+          }
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          const orderedIndices = getAutoPriorityBubbleIndices(
+            jsonData,
+            selectedIndex,
+          );
+          const currentPosition = orderedIndices.indexOf(selectedIndex);
           const previousPosition =
             currentPosition === -1
               ? orderedIndices.length - 1
@@ -1979,23 +2005,6 @@
             ];
           if (previousIndex !== undefined) {
             selectBubble(previousIndex);
-          }
-        }
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(
-            jsonData,
-            selectedIndex,
-          );
-          const currentPosition = orderedIndices.indexOf(selectedIndex);
-          const nextPosition =
-            currentPosition === -1 ? 0 : currentPosition + 1;
-          const nextIndex =
-            orderedIndices[
-              nextPosition >= orderedIndices.length ? 0 : nextPosition
-            ];
-          if (nextIndex !== undefined) {
-            selectBubble(nextIndex);
           }
         }
       });
