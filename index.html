@@ -1402,7 +1402,16 @@
           const orderLabel = Number.isFinite(Number(item.order))
             ? item.order
             : index + 1;
-          button.textContent = `#${orderLabel}`;
+          const bubbleIdLabel = item.id ?? index + 1;
+          const translatedText = (item.text ?? "").trim();
+          const translatedPreview = translatedText
+            ? ` : ${
+                translatedText.length > 40
+                  ? `${translatedText.slice(0, 40)}…`
+                  : translatedText
+              }`
+            : "";
+          button.textContent = `#${orderLabel} | ${bubbleIdLabel}${translatedPreview}`;
           button.addEventListener("click", () => selectBubble(index));
           if (index === selectedIndex) {
             button.classList.add("active");
