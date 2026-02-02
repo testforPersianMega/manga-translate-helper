@@ -1044,7 +1044,11 @@
         return overlapping;
       };
 
-      const getAutoPriorityBubbleIndices = (jsonData, currentIndex) => {
+      const getAutoPriorityBubbleIndices = (
+        jsonData,
+        currentIndex,
+        direction = "forward",
+      ) => {
         const orderedIndices = getOrderedBubbleIndices(jsonData);
         if (!orderedIndices.length || currentIndex < 0) {
           logOrderEvent("auto-priority-no-current", { orderedIndices });
@@ -1063,23 +1067,59 @@
           });
           return orderedIndices;
         }
-        const overlapSet = new Set(overlappingIndices);
+        const positionMap = new Map(
+          orderedIndices.map((index, position) => [index, position]),
+        );
+        const orderedOverlaps = overlappingIndices
+          .slice()
+          .sort(
+            (a, b) =>
+              (positionMap.get(a) ?? 0) - (positionMap.get(b) ?? 0),
+          );
+        const directionalOverlaps =
+          direction === "backward"
+            ? orderedOverlaps.filter(
+                (index) => (positionMap.get(index) ?? -1) < currentPosition,
+              )
+            : orderedOverlaps.filter(
+                (index) => (positionMap.get(index) ?? -1) > currentPosition,
+              );
+        if (!directionalOverlaps.length) {
+          logOverlapEvent("auto-priority-no-directional-overlap", {
+            currentIndex,
+            orderedIndices,
+            overlappingIndices,
+            direction,
+          });
+          return orderedIndices;
+        }
+        const overlapSet = new Set(directionalOverlaps);
         const beforeCurrent = orderedIndices
           .slice(0, currentPosition)
           .filter((index) => !overlapSet.has(index));
         const afterCurrent = orderedIndices
           .slice(currentPosition + 1)
           .filter((index) => !overlapSet.has(index));
-        const prioritized = [
-          ...beforeCurrent,
-          currentIndex,
-          ...overlappingIndices,
-          ...afterCurrent,
-        ];
+        const prioritized =
+          direction === "backward"
+            ? [
+                ...beforeCurrent,
+                ...directionalOverlaps,
+                currentIndex,
+                ...afterCurrent,
+              ]
+            : [
+                ...beforeCurrent,
+                currentIndex,
+                ...directionalOverlaps,
+                ...afterCurrent,
+              ];
         logOverlapEvent("auto-priority-overlap", {
           currentIndex,
           orderedIndices,
           overlappingIndices,
+          directionalOverlaps,
+          direction,
           prioritized,
         });
         return prioritized;
@@ -1994,6 +2034,7 @@
           const orderedIndices = getAutoPriorityBubbleIndices(
             jsonData,
             selectedIndex,
+            "forward",
           );
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const nextPosition = currentPosition === -1 ? 0 : currentPosition + 1;
@@ -2010,6 +2051,7 @@
           const orderedIndices = getAutoPriorityBubbleIndices(
             jsonData,
             selectedIndex,
+            "backward",
           );
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const previousPosition =
