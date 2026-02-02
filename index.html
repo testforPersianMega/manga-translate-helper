@@ -819,10 +819,11 @@
 
       const getItemBbox = (item) => item.bbox_bubble ?? item.bbox_text ?? null;
 
-      const RIGHT_PRIORITY_WEIGHT = 1.1;
+      const FIRST_RIGHT_PRIORITY_WEIGHT = 1.1;
+      const OTHER_RIGHT_PRIORITY_WEIGHT = 1.2;
 
-      const getRightTopPriorityScore = (entry) =>
-        entry.yMin - entry.xCenter * RIGHT_PRIORITY_WEIGHT;
+      const getRightTopPriorityScore = (entry, weight) =>
+        entry.yMin - entry.xCenter * weight;
 
       const getBboxEdges = (bbox) => {
         if (!bbox) return null;
@@ -884,8 +885,14 @@
         }
         const anchor = withBbox.reduce((best, entry) => {
           if (!best) return entry;
-          const entryPriority = getRightTopPriorityScore(entry);
-          const bestPriority = getRightTopPriorityScore(best);
+          const entryPriority = getRightTopPriorityScore(
+            entry,
+            FIRST_RIGHT_PRIORITY_WEIGHT,
+          );
+          const bestPriority = getRightTopPriorityScore(
+            best,
+            FIRST_RIGHT_PRIORITY_WEIGHT,
+          );
           if (entryPriority !== bestPriority) {
             return entryPriority < bestPriority ? entry : best;
           }
@@ -900,8 +907,14 @@
             if (distanceA !== distanceB) {
               return distanceA - distanceB;
             }
-            const priorityA = getRightTopPriorityScore(a);
-            const priorityB = getRightTopPriorityScore(b);
+            const priorityA = getRightTopPriorityScore(
+              a,
+              OTHER_RIGHT_PRIORITY_WEIGHT,
+            );
+            const priorityB = getRightTopPriorityScore(
+              b,
+              OTHER_RIGHT_PRIORITY_WEIGHT,
+            );
             if (priorityA !== priorityB) {
               return priorityA - priorityB;
             }
