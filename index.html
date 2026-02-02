@@ -1071,7 +1071,6 @@
       };
 
       const getOrderedBubbleIndices = (jsonData) => {
-        ensureBubbleOrders(jsonData);
         const entries = jsonData.items.map((item, index) => ({
           index,
           order: Number(item.order),
@@ -1296,7 +1295,8 @@
 
       const autoOrderBubbles = (jsonData) => {
         if (!jsonData?.items?.length) return;
-        normalizeBubbleOrders(jsonData);
+        const orderedIndices = getRowBasedBubbleIndices(jsonData);
+        updateOrdersFromIndices(jsonData, orderedIndices, "row-auto-order");
         applyInitialOverlapOrdering(jsonData);
       };
 
@@ -1499,7 +1499,6 @@
       const selectBubble = (index) => {
         const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
-        ensureBubbleOrders(jsonData);
         const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
         selectedIndex = clamped;
         const item = jsonData.items[clamped];
@@ -1561,6 +1560,7 @@
         if (!page?.jsonData) return;
         autoOrderBubbles(page.jsonData);
         setManualOrderNotice(false);
+        page.overlapOrdered = true;
         renderBubbleList();
         if (selectedIndex >= 0) {
           bubbleOrder.value = page.jsonData.items[selectedIndex].order ?? "";
