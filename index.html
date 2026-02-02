@@ -538,6 +538,10 @@
             <input id="bubbleId" type="text" readonly />
           </div>
           <div class="field">
+            <label>Order</label>
+            <input id="bubbleOrder" type="number" min="1" step="1" />
+          </div>
+          <div class="field">
             <label>Original Text</label>
             <textarea id="bubbleOriginal" readonly></textarea>
           </div>
@@ -578,6 +582,7 @@
       const detailPlaceholder = document.getElementById("detailPlaceholder");
       const detailForm = document.getElementById("detailForm");
       const bubbleId = document.getElementById("bubbleId");
+      const bubbleOrder = document.getElementById("bubbleOrder");
       const bubbleOriginal = document.getElementById("bubbleOriginal");
       const bubbleText = document.getElementById("bubbleText");
       const bubbleType = document.getElementById("bubbleType");
@@ -756,6 +761,7 @@
         detailForm.hidden = true;
         detailPlaceholder.hidden = false;
         bubbleId.value = "";
+        bubbleOrder.value = "";
         bubbleOriginal.value = "";
         bubbleText.value = "";
         bubbleType.value = "Standard";
@@ -772,22 +778,162 @@
       const getItemBbox = (item) =>
         item.bbox_bubble ?? item.bbox_text ?? null;
 
-      const getOrderedBubbleIndices = (jsonData) => {
+      const getRowBasedBubbleIndices = (jsonData) => {
+        const entries = jsonData.items.map((item, index) => {
+          const bbox = getItemBbox(item);
+          if (!bbox) {
+            return {
+              index,
+              bbox: null,
+              xMin: Number.POSITIVE_INFINITY,
+              yMin: Number.POSITIVE_INFINITY,
+              yMax: Number.POSITIVE_INFINITY,
+              height: 0,
+            };
+          }
+          return {
+            index,
+            bbox,
+            xMin: bbox.x_min,
+            yMin: bbox.y_min,
+            yMax: bbox.y_max,
+            height: Math.max(0, bbox.y_max - bbox.y_min),
+          };
+        });
+        const withBbox = entries.filter((entry) => entry.bbox);
+        const withoutBbox = entries.filter((entry) => !entry.bbox);
+        if (!withBbox.length) {
+          return entries.map((entry) => entry.index);
+        }
+        const heights = withBbox
+          .map((entry) => entry.height)
+          .sort((a, b) => a - b);
+        const medianHeight =
+          heights[Math.floor(heights.length / 2)] ?? MIN_BBOX_SIZE;
+        const rowTolerance = Math.max(8, medianHeight * 0.6);
+        withBbox.sort((a, b) => {
+          if (a.yMin !== b.yMin) {
+            return a.yMin - b.yMin;
+          }
+          if (a.xMin !== b.xMin) {
+            return a.xMin - b.xMin;
+          }
+          return a.index - b.index;
+        });
+        const rows = [];
+        withBbox.forEach((entry) => {
+          const row = rows.at(-1);
+          if (!row) {
+            rows.push({
+              top: entry.yMin,
+              bottom: entry.yMax,
+              entries: [entry],
+            });
+            return;
+          }
+          if (entry.yMin <= row.bottom + rowTolerance) {
+            row.entries.push(entry);
+            row.top = Math.min(row.top, entry.yMin);
+            row.bottom = Math.max(row.bottom, entry.yMax);
+            return;
+          }
+          rows.push({
+            top: entry.yMin,
+            bottom: entry.yMax,
+            entries: [entry],
+          });
+        });
+        rows.forEach((row) => {
+          row.entries.sort((a, b) => {
+            if (a.xMin !== b.xMin) {
+              return a.xMin - b.xMin;
+            }
+            if (a.yMin !== b.yMin) {
+              return a.yMin - b.yMin;
+            }
+            return a.index - b.index;
+          });
+        });
+        const ordered = rows.flatMap((row) =>
+          row.entries.map((entry) => entry.index),
+        );
+        return ordered.concat(withoutBbox.map((entry) => entry.index));
+      };
+
+      const fillMissingBubbleOrders = (jsonData) => {
+        if (!jsonData?.items?.length) return;
+        const usedOrders = new Set(
+          jsonData.items
+            .map((item) => Number(item.order))
+            .filter((value) => Number.isFinite(value)),
+        );
+        let nextOrder = 1;
+        const rowOrder = getRowBasedBubbleIndices(jsonData);
+        rowOrder.forEach((index) => {
+          const item = jsonData.items[index];
+          if (Number.isFinite(Number(item.order))) return;
+          while (usedOrders.has(nextOrder)) {
+            nextOrder += 1;
+          }
+          item.order = nextOrder;
+          usedOrders.add(nextOrder);
+        });
+      };
+
+      const normalizeBubbleOrders = (jsonData) => {
+        if (!jsonData?.items?.length) return;
+        fillMissingBubbleOrders(jsonData);
+        const rowOrder = getRowBasedBubbleIndices(jsonData);
+        const rowRank = new Map(
+          rowOrder.map((index, position) => [index, position]),
+        );
         const entries = jsonData.items.map((item, index) => ({
           index,
-          bbox: getItemBbox(item),
+          order: Number(item.order),
         }));
         entries.sort((a, b) => {
-          if (!a.bbox && !b.bbox) {
-            return a.index - b.index;
+          const orderA = Number.isFinite(a.order)
+            ? a.order
+            : Number.POSITIVE_INFINITY;
+          const orderB = Number.isFinite(b.order)
+            ? b.order
+            : Number.POSITIVE_INFINITY;
+          if (orderA !== orderB) {
+            return orderA - orderB;
           }
-          if (!a.bbox) return 1;
-          if (!b.bbox) return -1;
-          if (a.bbox.x_min !== b.bbox.x_min) {
-            return a.bbox.x_min - b.bbox.x_min;
-          }
-          if (a.bbox.y_min !== b.bbox.y_min) {
-            return a.bbox.y_min - b.bbox.y_min;
+          return (rowRank.get(a.index) ?? a.index) -
+            (rowRank.get(b.index) ?? b.index);
+        });
+        entries.forEach((entry, position) => {
+          jsonData.items[entry.index].order = position + 1;
+        });
+      };
+
+      const ensureBubbleOrders = (jsonData) => {
+        if (!jsonData?.items?.length) return;
+        const hasMissing = jsonData.items.some(
+          (item) => !Number.isFinite(Number(item.order)),
+        );
+        if (hasMissing) {
+          normalizeBubbleOrders(jsonData);
+        }
+      };
+
+      const getOrderedBubbleIndices = (jsonData) => {
+        ensureBubbleOrders(jsonData);
+        const entries = jsonData.items.map((item, index) => ({
+          index,
+          order: Number(item.order),
+        }));
+        entries.sort((a, b) => {
+          const orderA = Number.isFinite(a.order)
+            ? a.order
+            : Number.POSITIVE_INFINITY;
+          const orderB = Number.isFinite(b.order)
+            ? b.order
+            : Number.POSITIVE_INFINITY;
+          if (orderA !== orderB) {
+            return orderA - orderB;
           }
           return a.index - b.index;
         });
@@ -857,7 +1003,10 @@
           const item = jsonData.items[index];
           const button = document.createElement("button");
           button.type = "button";
-          button.textContent = `#${item.id ?? index + 1}`;
+          const orderLabel = Number.isFinite(Number(item.order))
+            ? item.order
+            : index + 1;
+          button.textContent = `#${orderLabel}`;
           button.addEventListener("click", () => selectBubble(index));
           if (index === selectedIndex) {
             button.classList.add("active");
@@ -913,11 +1062,15 @@
       const selectBubble = (index) => {
         const jsonData = getCurrentJson();
         if (!jsonData?.items?.length) return;
+        ensureBubbleOrders(jsonData);
         const clamped = Math.max(0, Math.min(index, jsonData.items.length - 1));
         selectedIndex = clamped;
         const item = jsonData.items[clamped];
         normalizeItem(item);
         bubbleId.value = item.id ?? clamped + 1;
+        bubbleOrder.value = Number.isFinite(Number(item.order))
+          ? item.order
+          : "";
         bubbleOriginal.value = item.text_original ?? "";
         bubbleText.value = item.text ?? "";
         bubbleType.value = item.bubble_type;
@@ -934,6 +1087,17 @@
         jsonData.items[selectedIndex].text = event.target.value;
       });
 
+      bubbleOrder.addEventListener("change", (event) => {
+        const jsonData = getCurrentJson();
+        if (selectedIndex < 0 || !jsonData) return;
+        const nextOrder = Number.parseInt(event.target.value, 10);
+        if (!Number.isFinite(nextOrder)) return;
+        jsonData.items[selectedIndex].order = nextOrder;
+        normalizeBubbleOrders(jsonData);
+        bubbleOrder.value = jsonData.items[selectedIndex].order;
+        renderBubbleList();
+      });
+
       bubbleType.addEventListener("change", (event) => {
         const jsonData = getCurrentJson();
         if (selectedIndex < 0 || !jsonData) return;
@@ -945,6 +1109,9 @@
         currentPageIndex = index;
         setDrawingMode(false);
         const page = getCurrentPage();
+        if (page?.jsonData) {
+          ensureBubbleOrders(page.jsonData);
+        }
         if (page?.imageUrl) {
           mainImage.src = page.imageUrl;
           imagePlaceholder.style.display = "none";
@@ -1034,6 +1201,7 @@
                 return;
               }
               data.items.forEach((item) => normalizeItem(item));
+              ensureBubbleOrders(data);
               const baseName = getBaseName(file.name);
               const existing = findPageByBaseName(baseName);
               if (existing) {
@@ -1376,6 +1544,7 @@
           },
         };
         jsonData.items.push(newItem);
+        ensureBubbleOrders(jsonData);
         cancelDrawBubble();
         setDrawingMode(false);
         selectBubble(jsonData.items.length - 1);
