@@ -814,6 +814,26 @@
         );
       };
 
+      const ROW_OVERLAP_RATIO = 0.45;
+
+      const bboxesShareRow = (a, b) => {
+        const boxA = getBboxEdges(a);
+        const boxB = getBboxEdges(b);
+        if (!boxA || !boxB) return false;
+        const overlapY = Math.max(
+          0,
+          Math.min(boxA.yMax, boxB.yMax) - Math.max(boxA.yMin, boxB.yMin),
+        );
+        const heightA = Math.max(0, boxA.yMax - boxA.yMin);
+        const heightB = Math.max(0, boxB.yMax - boxB.yMin);
+        const minHeight = Math.min(heightA, heightB);
+        if (!minHeight) return false;
+        return overlapY / minHeight >= ROW_OVERLAP_RATIO;
+      };
+
+      const bboxesOverlapOrShareRow = (a, b) =>
+        bboxesOverlap(a, b) || bboxesShareRow(a, b);
+
       const getOverlapArea = (a, b) => {
         const boxA = getBboxEdges(a);
         const boxB = getBboxEdges(b);
@@ -877,7 +897,7 @@
         const ordered = withBbox
           .slice()
           .sort((a, b) => {
-            if (bboxesOverlap(a, b)) {
+            if (bboxesOverlapOrShareRow(a, b)) {
               if (a.yCenter !== b.yCenter) {
                 return a.yCenter - b.yCenter;
               }
@@ -999,7 +1019,7 @@
         const overlapCandidates = orderedIndices.filter((index) => {
           if (index === currentIndex) return false;
           const candidateBbox = getItemBbox(jsonData.items[index]);
-          return bboxesOverlap(currentBbox, candidateBbox);
+          return bboxesOverlapOrShareRow(currentBbox, candidateBbox);
         });
         if (!overlapCandidates.length) return orderedIndices;
         console.debug("auto-order overlap candidates", {
