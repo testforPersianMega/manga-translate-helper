@@ -786,18 +786,28 @@
               index,
               bbox: null,
               xMin: Number.POSITIVE_INFINITY,
+              xMax: Number.POSITIVE_INFINITY,
               yMin: Number.POSITIVE_INFINITY,
               yMax: Number.POSITIVE_INFINITY,
+              xCenter: Number.POSITIVE_INFINITY,
+              yCenter: Number.POSITIVE_INFINITY,
+              width: 0,
               height: 0,
             };
           }
+          const width = Math.max(0, bbox.x_max - bbox.x_min);
+          const height = Math.max(0, bbox.y_max - bbox.y_min);
           return {
             index,
             bbox,
             xMin: bbox.x_min,
+            xMax: bbox.x_max,
             yMin: bbox.y_min,
             yMax: bbox.y_max,
-            height: Math.max(0, bbox.y_max - bbox.y_min),
+            xCenter: bbox.x_min + width / 2,
+            yCenter: bbox.y_min + height / 2,
+            width,
+            height,
           };
         });
         const withBbox = entries.filter((entry) => entry.bbox);
@@ -808,15 +818,21 @@
         const heights = withBbox
           .map((entry) => entry.height)
           .sort((a, b) => a - b);
+        const widths = withBbox
+          .map((entry) => entry.width)
+          .sort((a, b) => a - b);
         const medianHeight =
           heights[Math.floor(heights.length / 2)] ?? MIN_BBOX_SIZE;
+        const medianWidth =
+          widths[Math.floor(widths.length / 2)] ?? MIN_BBOX_SIZE;
         const rowTolerance = Math.max(8, medianHeight * 0.6);
+        const columnTolerance = Math.max(12, medianWidth * 0.25);
         withBbox.sort((a, b) => {
           if (a.yMin !== b.yMin) {
             return a.yMin - b.yMin;
           }
-          if (a.xMin !== b.xMin) {
-            return a.xMin - b.xMin;
+          if (a.xCenter !== b.xCenter) {
+            return b.xCenter - a.xCenter;
           }
           return a.index - b.index;
         });
@@ -845,8 +861,9 @@
         });
         rows.forEach((row) => {
           row.entries.sort((a, b) => {
-            if (a.xMin !== b.xMin) {
-              return a.xMin - b.xMin;
+            const xDelta = b.xCenter - a.xCenter;
+            if (Math.abs(xDelta) > columnTolerance) {
+              return xDelta;
             }
             if (a.yMin !== b.yMin) {
               return a.yMin - b.yMin;
