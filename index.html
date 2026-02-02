@@ -800,33 +800,6 @@
         return { xMin, xMax, yMin, yMax };
       };
 
-      const bboxesOverlap = (a, b) => {
-        const boxA = getBboxEdges(a);
-        const boxB = getBboxEdges(b);
-        const epsilon = 0.0001;
-        return (
-          boxA &&
-          boxB &&
-          boxA.xMin <= boxB.xMax + epsilon &&
-          boxA.xMax + epsilon >= boxB.xMin &&
-          boxA.yMin <= boxB.yMax + epsilon &&
-          boxA.yMax + epsilon >= boxB.yMin
-        );
-      };
-
-      const getOverlapArea = (a, b) => {
-        const boxA = getBboxEdges(a);
-        const boxB = getBboxEdges(b);
-        if (!boxA || !boxB) return 0;
-        const xMin = Math.max(boxA.xMin, boxB.xMin);
-        const xMax = Math.min(boxA.xMax, boxB.xMax);
-        const yMin = Math.max(boxA.yMin, boxB.yMin);
-        const yMax = Math.min(boxA.yMax, boxB.yMax);
-        const width = Math.max(0, xMax - xMin);
-        const height = Math.max(0, yMax - yMin);
-        return width * height;
-      };
-
       const getRowBasedBubbleIndices = (jsonData) => {
         const entries = jsonData.items.map((item, index) => {
           const bbox = getItemBbox(item);
@@ -877,14 +850,6 @@
         const ordered = withBbox
           .slice()
           .sort((a, b) => {
-            if (bboxesOverlap(a, b)) {
-              if (a.yCenter !== b.yCenter) {
-                return a.yCenter - b.yCenter;
-              }
-              if (a.xCenter !== b.xCenter) {
-                return b.xCenter - a.xCenter;
-              }
-            }
             const distanceA = Math.abs(a.yCenter - anchorCenter);
             const distanceB = Math.abs(b.yCenter - anchorCenter);
             if (distanceA !== distanceB) {
@@ -987,62 +952,8 @@
         return bbox.x_min + (bbox.x_max - bbox.x_min) / 2;
       };
 
-      const getAutoPriorityBubbleIndices = (jsonData, currentIndex) => {
-        const orderedIndices = getOrderedBubbleIndices(jsonData);
-        if (currentIndex < 0) return orderedIndices;
-        const currentPosition = orderedIndices.indexOf(currentIndex);
-        if (currentPosition === -1) return orderedIndices;
-        const currentItem = jsonData.items[currentIndex];
-        const currentBbox = getItemBbox(currentItem);
-        const currentEdges = getBboxEdges(currentBbox);
-        if (!currentBbox) return orderedIndices;
-        const overlapCandidates = orderedIndices.filter((index) => {
-          if (index === currentIndex) return false;
-          const candidateBbox = getItemBbox(jsonData.items[index]);
-          return bboxesOverlap(currentBbox, candidateBbox);
-        });
-        if (!overlapCandidates.length) return orderedIndices;
-        console.debug("auto-order overlap candidates", {
-          currentIndex,
-          currentEdges,
-          overlapCandidates,
-        });
-        const overlapSet = new Set(overlapCandidates);
-        overlapCandidates.sort((a, b) => {
-          const bboxA = getItemBbox(jsonData.items[a]);
-          const bboxB = getItemBbox(jsonData.items[b]);
-          const overlapA = getOverlapArea(currentBbox, bboxA);
-          const overlapB = getOverlapArea(currentBbox, bboxB);
-          console.debug("auto-order overlap priority compare", {
-            currentIndex,
-            candidateA: a,
-            candidateB: b,
-            candidateEdgesA: getBboxEdges(bboxA),
-            candidateEdgesB: getBboxEdges(bboxB),
-            overlapA,
-            overlapB,
-          });
-          if (overlapA !== overlapB) {
-            return overlapB - overlapA;
-          }
-          return orderedIndices.indexOf(a) - orderedIndices.indexOf(b);
-        });
-        console.debug("auto-order overlap priority sorted", {
-          currentIndex,
-          overlapCandidates,
-        });
-        const baseIndices = orderedIndices.filter(
-          (index) => !overlapSet.has(index),
-        );
-        const baseCurrentPosition = baseIndices.indexOf(currentIndex);
-        if (baseCurrentPosition === -1) return orderedIndices;
-        return baseIndices
-          .slice(0, baseCurrentPosition + 1)
-          .concat(
-            overlapCandidates,
-            baseIndices.slice(baseCurrentPosition + 1),
-          );
-      };
+      const getAutoPriorityBubbleIndices = (jsonData) =>
+        getOrderedBubbleIndices(jsonData);
 
       const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
         const orderedIndices = getOrderedBubbleIndices(jsonData);
@@ -1942,10 +1853,21 @@
         if (!jsonData?.items?.length) return;
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(
-            jsonData,
-            selectedIndex,
-          );
+          const orderedIndices = getAutoPriorityBubbleIndices(jsonData);
+          const currentPosition = orderedIndices.indexOf(selectedIndex);
+          const nextPosition =
+            currentPosition === -1 ? 0 : currentPosition + 1;
+          const nextIndex =
+            orderedIndices[
+              nextPosition >= orderedIndices.length ? 0 : nextPosition
+            ];
+          if (nextIndex !== undefined) {
+            selectBubble(nextIndex);
+          }
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          const orderedIndices = getAutoPriorityBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const previousPosition =
             currentPosition === -1
@@ -1959,23 +1881,6 @@
             ];
           if (previousIndex !== undefined) {
             selectBubble(previousIndex);
-          }
-        }
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          const orderedIndices = getAutoPriorityBubbleIndices(
-            jsonData,
-            selectedIndex,
-          );
-          const currentPosition = orderedIndices.indexOf(selectedIndex);
-          const nextPosition =
-            currentPosition === -1 ? 0 : currentPosition + 1;
-          const nextIndex =
-            orderedIndices[
-              nextPosition >= orderedIndices.length ? 0 : nextPosition
-            ];
-          if (nextIndex !== undefined) {
-            selectBubble(nextIndex);
           }
         }
       });
