@@ -995,19 +995,21 @@
       };
 
       const getBubbleXCenter = (item) => {
-        const bbox = getItemBbox(item);
-        if (!bbox) return Number.POSITIVE_INFINITY;
-        return bbox.x_min + (bbox.x_max - bbox.x_min) / 2;
+        const edges = getBboxEdges(getItemBbox(item));
+        if (!edges) return Number.POSITIVE_INFINITY;
+        return edges.xMin + (edges.xMax - edges.xMin) / 2;
       };
 
       const areBboxesOverlapping = (bboxA, bboxB) => {
-        if (!bboxA || !bboxB) return false;
+        const edgesA = getBboxEdges(bboxA);
+        const edgesB = getBboxEdges(bboxB);
+        if (!edgesA || !edgesB) return false;
         const xOverlap =
-          Math.min(bboxA.x_max, bboxB.x_max) -
-          Math.max(bboxA.x_min, bboxB.x_min);
+          Math.min(edgesA.xMax, edgesB.xMax) -
+          Math.max(edgesA.xMin, edgesB.xMin);
         const yOverlap =
-          Math.min(bboxA.y_max, bboxB.y_max) -
-          Math.max(bboxA.y_min, bboxB.y_min);
+          Math.min(edgesA.yMax, edgesB.yMax) -
+          Math.max(edgesA.yMin, edgesB.yMin);
         return xOverlap > 0 && yOverlap > 0;
       };
 
