@@ -783,20 +783,45 @@
       const getRightTopPriorityScore = (entry) =>
         entry.yMin - entry.xCenter * RIGHT_PRIORITY_WEIGHT;
 
-      const bboxesOverlap = (a, b) =>
-        a &&
-        b &&
-        a.xMin <= b.xMax &&
-        a.xMax >= b.xMin &&
-        a.yMin <= b.yMax &&
-        a.yMax >= b.yMin;
+      const getBboxEdges = (bbox) => {
+        if (!bbox) return null;
+        const xMin = Number(bbox.xMin ?? bbox.x_min);
+        const xMax = Number(bbox.xMax ?? bbox.x_max);
+        const yMin = Number(bbox.yMin ?? bbox.y_min);
+        const yMax = Number(bbox.yMax ?? bbox.y_max);
+        if (
+          !Number.isFinite(xMin) ||
+          !Number.isFinite(xMax) ||
+          !Number.isFinite(yMin) ||
+          !Number.isFinite(yMax)
+        ) {
+          return null;
+        }
+        return { xMin, xMax, yMin, yMax };
+      };
+
+      const bboxesOverlap = (a, b) => {
+        const boxA = getBboxEdges(a);
+        const boxB = getBboxEdges(b);
+        const epsilon = 0.0001;
+        return (
+          boxA &&
+          boxB &&
+          boxA.xMin <= boxB.xMax + epsilon &&
+          boxA.xMax + epsilon >= boxB.xMin &&
+          boxA.yMin <= boxB.yMax + epsilon &&
+          boxA.yMax + epsilon >= boxB.yMin
+        );
+      };
 
       const getOverlapArea = (a, b) => {
-        if (!a || !b) return 0;
-        const xMin = Math.max(a.x_min, b.x_min);
-        const xMax = Math.min(a.x_max, b.x_max);
-        const yMin = Math.max(a.y_min, b.y_min);
-        const yMax = Math.min(a.y_max, b.y_max);
+        const boxA = getBboxEdges(a);
+        const boxB = getBboxEdges(b);
+        if (!boxA || !boxB) return 0;
+        const xMin = Math.max(boxA.xMin, boxB.xMin);
+        const xMax = Math.min(boxA.xMax, boxB.xMax);
+        const yMin = Math.max(boxA.yMin, boxB.yMin);
+        const yMax = Math.min(boxA.yMax, boxB.yMax);
         const width = Math.max(0, xMax - xMin);
         const height = Math.max(0, yMax - yMin);
         return width * height;
@@ -969,6 +994,7 @@
         if (currentPosition === -1) return orderedIndices;
         const currentItem = jsonData.items[currentIndex];
         const currentBbox = getItemBbox(currentItem);
+        const currentEdges = getBboxEdges(currentBbox);
         if (!currentBbox) return orderedIndices;
         const overlapCandidates = orderedIndices.filter((index) => {
           if (index === currentIndex) return false;
@@ -976,20 +1002,34 @@
           return bboxesOverlap(currentBbox, candidateBbox);
         });
         if (!overlapCandidates.length) return orderedIndices;
+        console.debug("auto-order overlap candidates", {
+          currentIndex,
+          currentEdges,
+          overlapCandidates,
+        });
         const overlapSet = new Set(overlapCandidates);
         overlapCandidates.sort((a, b) => {
-          const overlapA = getOverlapArea(
-            currentBbox,
-            getItemBbox(jsonData.items[a]),
-          );
-          const overlapB = getOverlapArea(
-            currentBbox,
-            getItemBbox(jsonData.items[b]),
-          );
+          const bboxA = getItemBbox(jsonData.items[a]);
+          const bboxB = getItemBbox(jsonData.items[b]);
+          const overlapA = getOverlapArea(currentBbox, bboxA);
+          const overlapB = getOverlapArea(currentBbox, bboxB);
+          console.debug("auto-order overlap priority compare", {
+            currentIndex,
+            candidateA: a,
+            candidateB: b,
+            candidateEdgesA: getBboxEdges(bboxA),
+            candidateEdgesB: getBboxEdges(bboxB),
+            overlapA,
+            overlapB,
+          });
           if (overlapA !== overlapB) {
             return overlapB - overlapA;
           }
           return orderedIndices.indexOf(a) - orderedIndices.indexOf(b);
+        });
+        console.debug("auto-order overlap priority sorted", {
+          currentIndex,
+          overlapCandidates,
         });
         const baseIndices = orderedIndices.filter(
           (index) => !overlapSet.has(index),
