@@ -977,10 +977,17 @@
           }
           return orderedIndices.indexOf(a) - orderedIndices.indexOf(b);
         });
-        const remainingIndices = orderedIndices.filter(
-          (index) => index !== currentIndex && !overlapSet.has(index),
+        const baseIndices = orderedIndices.filter(
+          (index) => !overlapSet.has(index),
         );
-        return [currentIndex, ...overlapCandidates, ...remainingIndices];
+        const baseCurrentPosition = baseIndices.indexOf(currentIndex);
+        if (baseCurrentPosition === -1) return orderedIndices;
+        return baseIndices
+          .slice(0, baseCurrentPosition + 1)
+          .concat(
+            overlapCandidates,
+            baseIndices.slice(baseCurrentPosition + 1),
+          );
       };
 
       const getNextBubbleIndexByCenter = (jsonData, currentIndex) => {
