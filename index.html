@@ -778,6 +778,11 @@
       const getItemBbox = (item) =>
         item.bbox_bubble ?? item.bbox_text ?? null;
 
+      const RIGHT_PRIORITY_WEIGHT = 1.1;
+
+      const getRightTopPriorityScore = (entry) =>
+        entry.yMin - entry.xCenter * RIGHT_PRIORITY_WEIGHT;
+
       const getRowBasedBubbleIndices = (jsonData) => {
         const entries = jsonData.items.map((item, index) => {
           const bbox = getItemBbox(item);
@@ -817,11 +822,10 @@
         }
         const anchor = withBbox.reduce((best, entry) => {
           if (!best) return entry;
-          if (entry.yMin !== best.yMin) {
-            return entry.yMin < best.yMin ? entry : best;
-          }
-          if (entry.xCenter !== best.xCenter) {
-            return entry.xCenter > best.xCenter ? entry : best;
+          const entryPriority = getRightTopPriorityScore(entry);
+          const bestPriority = getRightTopPriorityScore(best);
+          if (entryPriority !== bestPriority) {
+            return entryPriority < bestPriority ? entry : best;
           }
           return entry.index < best.index ? entry : best;
         }, null);
@@ -834,11 +838,10 @@
             if (distanceA !== distanceB) {
               return distanceA - distanceB;
             }
-            if (a.yMin !== b.yMin) {
-              return a.yMin - b.yMin;
-            }
-            if (a.xCenter !== b.xCenter) {
-              return b.xCenter - a.xCenter;
+            const priorityA = getRightTopPriorityScore(a);
+            const priorityB = getRightTopPriorityScore(b);
+            if (priorityA !== priorityB) {
+              return priorityA - priorityB;
             }
             return a.index - b.index;
           })
@@ -1050,7 +1053,7 @@
         const heightScale = displayedHeight / jsonData.image_size.height;
 
         jsonData.items.forEach((item, index) => {
-          const bbox = item.bbox_bubble ?? item.bbox_text;
+          const bbox = getItemBbox(item);
           if (!bbox) return;
           const left = bbox.x_min * widthScale;
           const top = bbox.y_min * heightScale;
@@ -1347,6 +1350,14 @@
       };
 
       const setItemBbox = (item, bbox) => {
+        if (item.bbox_bubble) {
+          item.bbox_bubble = { ...bbox };
+          return;
+        }
+        if (item.bbox_text) {
+          item.bbox_text = { ...bbox };
+          return;
+        }
         item.bbox_bubble = { ...bbox };
       };
 
@@ -1825,20 +1836,30 @@
           const orderedIndices = getOrderedBubbleIndices(jsonData);
           const currentPosition = orderedIndices.indexOf(selectedIndex);
           const previousPosition =
-            currentPosition === -1 ? 0 : currentPosition - 1;
+            currentPosition === -1
+              ? orderedIndices.length - 1
+              : currentPosition - 1;
           const previousIndex =
-            orderedIndices[Math.max(0, previousPosition)];
+            orderedIndices[
+              previousPosition < 0
+                ? orderedIndices.length - 1
+                : previousPosition
+            ];
           if (previousIndex !== undefined) {
             selectBubble(previousIndex);
           }
         }
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          const nextIndex = getNextBubbleIndexByCenter(
-            jsonData,
-            selectedIndex,
-          );
-          if (nextIndex !== undefined && nextIndex !== -1) {
+          const orderedIndices = getOrderedBubbleIndices(jsonData);
+          const currentPosition = orderedIndices.indexOf(selectedIndex);
+          const nextPosition =
+            currentPosition === -1 ? 0 : currentPosition + 1;
+          const nextIndex =
+            orderedIndices[
+              nextPosition >= orderedIndices.length ? 0 : nextPosition
+            ];
+          if (nextIndex !== undefined) {
             selectBubble(nextIndex);
           }
         }
