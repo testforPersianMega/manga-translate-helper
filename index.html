@@ -783,6 +783,14 @@
       const getRightTopPriorityScore = (entry) =>
         entry.yMin - entry.xCenter * RIGHT_PRIORITY_WEIGHT;
 
+      const bboxesOverlap = (a, b) =>
+        a &&
+        b &&
+        a.xMin <= b.xMax &&
+        a.xMax >= b.xMin &&
+        a.yMin <= b.yMax &&
+        a.yMax >= b.yMin;
+
       const getRowBasedBubbleIndices = (jsonData) => {
         const entries = jsonData.items.map((item, index) => {
           const bbox = getItemBbox(item);
@@ -833,6 +841,14 @@
         const ordered = withBbox
           .slice()
           .sort((a, b) => {
+            if (bboxesOverlap(a, b)) {
+              if (a.yCenter !== b.yCenter) {
+                return a.yCenter - b.yCenter;
+              }
+              if (a.xCenter !== b.xCenter) {
+                return b.xCenter - a.xCenter;
+              }
+            }
             const distanceA = Math.abs(a.yCenter - anchorCenter);
             const distanceB = Math.abs(b.yCenter - anchorCenter);
             if (distanceA !== distanceB) {
