@@ -325,7 +325,8 @@
       .bubble-overlay.active {
         border-color: var(--accent);
         background: rgba(59, 130, 246, 0.28);
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        box-shadow: 0 0 9px 2px rgb(0 0 0);
+        z-index: 10;
       }
 
       .bubble-overlay.drawing {
@@ -1171,8 +1172,7 @@
         const orderedOverlaps = overlappingIndices
           .slice()
           .sort(
-            (a, b) =>
-              (positionMap.get(a) ?? 0) - (positionMap.get(b) ?? 0),
+            (a, b) => (positionMap.get(a) ?? 0) - (positionMap.get(b) ?? 0),
           );
         const directionalOverlaps =
           direction === "backward"
@@ -1264,8 +1264,7 @@
         if (!orderedIndices.length) {
           return orderedIndices;
         }
-        const targetIndex =
-          currentIndex < 0 ? orderedIndices[0] : currentIndex;
+        const targetIndex = currentIndex < 0 ? orderedIndices[0] : currentIndex;
         const prioritized = getOverlapPriorityBubbleIndices(
           jsonData,
           targetIndex,
@@ -1276,11 +1275,7 @@
             (index, position) => orderedIndices[position] !== index,
           );
           if (changed) {
-            updateOrdersFromIndices(
-              jsonData,
-              prioritized,
-              "overlap-priority",
-            );
+            updateOrdersFromIndices(jsonData, prioritized, "overlap-priority");
           }
         }
         return prioritized;
