@@ -44,10 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function useToast() {
   const context = useContext(ToastContext);
   if (!context) {
-    if (typeof window === "undefined") {
-      return { notify: () => undefined };
-    }
-    throw new Error("useToast must be used within ToastProvider");
+    return { notify: () => undefined };
   }
   return context;
 }
