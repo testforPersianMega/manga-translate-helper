@@ -1,6 +1,6 @@
 export default function ProjectsAdminPage() {
   return (
-    <main>
+    <section>
       <h2>Translation Projects</h2>
       <p>Manage translation projects. Hook to /api/v1/projects.</p>
       <form style={{ display: "grid", gap: 8, maxWidth: 420 }}>
@@ -8,6 +8,6 @@ export default function ProjectsAdminPage() {
         <input name="assignedUserIds" placeholder="Assigned user IDs (comma-separated)" />
         <button type="button">Create Project</button>
       </form>
-    </main>
+    </section>
   );
 }

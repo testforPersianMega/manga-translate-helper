@@ -1,6 +1,6 @@
 export default function PagesAdminPage() {
   return (
-    <main>
+    <section>
       <h2>Pages</h2>
       <p>Manage pages and upload images. Hook to /api/v1/pages.</p>
       <form style={{ display: "grid", gap: 8, maxWidth: 420 }}>
@@ -12,6 +12,6 @@ export default function PagesAdminPage() {
         <input name="checksum" placeholder="Checksum" />
         <button type="button">Create Page</button>
       </form>
-    </main>
+    </section>
   );
 }
