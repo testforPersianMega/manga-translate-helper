@@ -1,0 +1,13 @@
+{
+  "name": "manga-translate-helper",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "docker compose -f infra/docker-compose.yml up --build",
+    "lint": "echo 'lint placeholder'",
+    "format": "echo 'format placeholder'"
+  }
+}
