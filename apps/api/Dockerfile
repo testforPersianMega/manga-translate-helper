@@ -1,6 +1,6 @@
 FROM node:20-bullseye-slim
 WORKDIR /app
-RUN apt-get update \
+RUN apt-get update -o Acquire::Retries=3 \
   && apt-get install -y --no-install-recommends python3 build-essential \
   && rm -rf /var/lib/apt/lists/*
 ENV PYTHON=/usr/bin/python3
