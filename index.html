@@ -619,7 +619,7 @@
           >
             <button type="button" id="zoomOutBtn" title="Zoom out">-</button>
             <button type="button" id="zoomInBtn" title="Zoom in">+</button>
-            <button type="button" id="zoomResetBtn" title="Reset zoom">
+            <button type="button" id="zoomResetBtn" title="Reset zoom (R)">
               Reset
             </button>
             <input
@@ -1269,6 +1269,12 @@
         zoomInBtn.disabled = zoomLevel >= MAX_ZOOM - 0.001;
         zoomRange.value = Math.round(zoomLevel * 100);
         updateGrabState();
+      };
+
+      const resetZoom = () => {
+        panX = 0;
+        panY = 0;
+        applyZoom(1);
       };
 
       const resetSelection = () => {
@@ -2224,9 +2230,7 @@
       });
 
       zoomResetBtn.addEventListener("click", () => {
-        panX = 0;
-        panY = 0;
-        applyZoom(1);
+        resetZoom();
       });
 
       zoomRange.addEventListener("input", (event) => {
@@ -2810,11 +2814,14 @@
             applyZoom(zoomLevel - ZOOM_STEP);
             return;
           }
+          if (isKeyboardCombo(event, ["KeyR"], ["r", "R"])) {
+            event.preventDefault();
+            resetZoom();
+            return;
+          }
           if (isKeyboardCombo(event, ["Digit0", "Numpad0"], ["0"])) {
             event.preventDefault();
-            panX = 0;
-            panY = 0;
-            applyZoom(1);
+            resetZoom();
             return;
           }
           if (event.shiftKey && event.key === "ArrowLeft") {
