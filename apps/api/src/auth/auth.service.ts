@@ -4,7 +4,6 @@ import { PrismaService } from "../common/prisma.service";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { LoginDto, RegisterDto } from "./dto";
-import type { RefreshToken } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -47,7 +46,7 @@ export class AuthService {
       }
     });
     const match = await Promise.all(
-      tokens.map(async (token: RefreshToken) => ({
+      tokens.map(async (token) => ({
         id: token.id,
         matches: await bcrypt.compare(refreshToken, token.tokenHash)
       }))
