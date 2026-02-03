@@ -559,6 +559,12 @@
             >
               Remove Bubble
             </button>
+            <button type="button" id="undoBtn" title="Undo (Ctrl/Cmd+Z)">
+              Undo
+            </button>
+            <button type="button" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">
+              Redo
+            </button>
           </div>
           <div class="placeholder" id="imagePlaceholder">
             Upload an image to begin.
@@ -677,6 +683,8 @@
       const zoomRange = document.getElementById("zoomRange");
       const addBubbleBtn = document.getElementById("addBubbleBtn");
       const removeBubbleBtn = document.getElementById("removeBubbleBtn");
+      const undoBtn = document.getElementById("undoBtn");
+      const redoBtn = document.getElementById("redoBtn");
 
       const bubbleTypeOptions = Array.from(bubbleType.options).map(
         (option) => option.value,
@@ -705,6 +713,9 @@
       let drawStart = null;
       let drawOverlay = null;
       let drawPointerId = null;
+      let isHistoryApplying = false;
+      let textEditSnapshot = null;
+      let textEditDirty = false;
       const logDragEvent = (message, event, details = {}) => {
         console.info(`[drag] ${message}`, {
           pointerId: event?.pointerId ?? null,
@@ -732,6 +743,110 @@
       const getBaseName = (filename) => filename.replace(/\.[^/.]+$/, "");
 
       const getCurrentPage = () => pages[currentPageIndex] ?? null;
+      const cloneJsonData = (data) =>
+        data ? JSON.parse(JSON.stringify(data)) : null;
+
+      const ensureHistoryState = (page) => {
+        if (!page) return;
+        page.undoStack = page.undoStack ?? [];
+        page.redoStack = page.redoStack ?? [];
+      };
+
+      const updateUndoRedoState = () => {
+        const page = getCurrentPage();
+        const canUndo =
+          Boolean(page?.jsonData) && (page?.undoStack?.length ?? 0) > 0;
+        const canRedo =
+          Boolean(page?.jsonData) && (page?.redoStack?.length ?? 0) > 0;
+        undoBtn.disabled = !canUndo;
+        redoBtn.disabled = !canRedo;
+      };
+
+      const pushHistorySnapshot = (page, snapshot, source) => {
+        if (!page?.jsonData || !snapshot || isHistoryApplying) return;
+        ensureHistoryState(page);
+        page.undoStack.push({
+          jsonData: snapshot,
+          manualOrderChanged: page.manualOrderChanged ?? false,
+        });
+        page.redoStack = [];
+        updateUndoRedoState();
+      };
+
+      const recordHistory = (page, source) => {
+        if (!page?.jsonData || isHistoryApplying) return;
+        pushHistorySnapshot(page, cloneJsonData(page.jsonData), source);
+      };
+
+      const refreshAfterHistoryChange = () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) {
+          resetSelection();
+          renderBubbleList();
+          renderOverlays();
+          updateStatus();
+          updateBubbleToolState();
+          updateUndoRedoState();
+          return;
+        }
+        ensureBubbleOrders(page.jsonData);
+        setManualOrderNotice(Boolean(page.manualOrderChanged));
+        if (selectedIndex >= page.jsonData.items.length) {
+          selectedIndex = page.jsonData.items.length - 1;
+        }
+        if (selectedIndex >= 0) {
+          selectBubble(selectedIndex);
+        } else {
+          resetSelection();
+          renderBubbleList();
+          renderOverlays();
+        }
+        updateStatus();
+        updateBubbleToolState();
+        updateUndoRedoState();
+      };
+
+      const undoChange = () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        ensureHistoryState(page);
+        if (!page.undoStack.length) return;
+        const snapshot = page.undoStack.pop();
+        page.redoStack.push({
+          jsonData: cloneJsonData(page.jsonData),
+          manualOrderChanged: page.manualOrderChanged ?? false,
+        });
+        const nextSnapshot =
+          snapshot && snapshot.jsonData ? snapshot.jsonData : snapshot;
+        isHistoryApplying = true;
+        page.jsonData = nextSnapshot;
+        if (snapshot && typeof snapshot.manualOrderChanged === "boolean") {
+          page.manualOrderChanged = snapshot.manualOrderChanged;
+        }
+        isHistoryApplying = false;
+        refreshAfterHistoryChange();
+      };
+
+      const redoChange = () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        ensureHistoryState(page);
+        if (!page.redoStack.length) return;
+        const snapshot = page.redoStack.pop();
+        page.undoStack.push({
+          jsonData: cloneJsonData(page.jsonData),
+          manualOrderChanged: page.manualOrderChanged ?? false,
+        });
+        const nextSnapshot =
+          snapshot && snapshot.jsonData ? snapshot.jsonData : snapshot;
+        isHistoryApplying = true;
+        page.jsonData = nextSnapshot;
+        if (snapshot && typeof snapshot.manualOrderChanged === "boolean") {
+          page.manualOrderChanged = snapshot.manualOrderChanged;
+        }
+        isHistoryApplying = false;
+        refreshAfterHistoryChange();
+      };
 
       const logOrderEvent = (message, details = {}) => {
         console.info(`[order] ${message}`, {
@@ -791,6 +906,7 @@
         addBubbleBtn.disabled = !hasJson;
         removeBubbleBtn.disabled = !hasJson || selectedIndex < 0;
         autoOrderBtn.disabled = !hasJson;
+        updateUndoRedoState();
         if (!hasJson) {
           manualOrderNotice.hidden = true;
         }
@@ -875,6 +991,8 @@
         bubbleOriginal.value = "";
         bubbleText.value = "";
         bubbleType.value = "Standard";
+        textEditSnapshot = null;
+        textEditDirty = false;
         updateBubbleToolState();
         setDrawingMode(false);
       };
@@ -1438,6 +1556,7 @@
             const orderedIndices = getOrderedBubbleIndices(jsonData);
             const targetPosition = orderedIndices.indexOf(index);
             if (targetPosition === -1 || fromIndex === index) return;
+            recordHistory(getCurrentPage(), "drag-reorder");
             reorderBubbleToPosition(
               jsonData,
               fromIndex,
@@ -1524,7 +1643,25 @@
       bubbleText.addEventListener("input", (event) => {
         const jsonData = getCurrentJson();
         if (selectedIndex < 0 || !jsonData) return;
+        textEditDirty = true;
         jsonData.items[selectedIndex].text = event.target.value;
+      });
+
+      bubbleText.addEventListener("focus", () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        textEditSnapshot = cloneJsonData(page.jsonData);
+        textEditDirty = false;
+      });
+
+      bubbleText.addEventListener("blur", () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData || !textEditSnapshot) return;
+        if (textEditDirty) {
+          pushHistorySnapshot(page, textEditSnapshot, "text-edit");
+        }
+        textEditSnapshot = null;
+        textEditDirty = false;
       });
 
       bubbleOrder.addEventListener("change", (event) => {
@@ -1533,6 +1670,7 @@
         const nextOrder = Number.parseInt(event.target.value, 10);
         if (!Number.isFinite(nextOrder)) return;
         const clampedOrder = clamp(nextOrder, 1, jsonData.items.length);
+        recordHistory(getCurrentPage(), "manual-order-change");
         logOrderEvent("manual-order-change", {
           index: selectedIndex,
           previousOrder: jsonData.items[selectedIndex].order,
@@ -1556,12 +1694,14 @@
       bubbleType.addEventListener("change", (event) => {
         const jsonData = getCurrentJson();
         if (selectedIndex < 0 || !jsonData) return;
+        recordHistory(getCurrentPage(), "bubble-type-change");
         jsonData.items[selectedIndex].bubble_type = event.target.value;
       });
 
       autoOrderBtn.addEventListener("click", () => {
         const page = getCurrentPage();
         if (!page?.jsonData) return;
+        recordHistory(page, "auto-order");
         autoOrderBubbles(page.jsonData);
         setManualOrderNotice(false);
         page.overlapOrdered = true;
@@ -1594,6 +1734,7 @@
         currentPageIndex = index;
         setDrawingMode(false);
         const page = getCurrentPage();
+        ensureHistoryState(page);
         if (page?.jsonData) {
           ensureBubbleOrders(page.jsonData);
           if (!page.overlapOrdered) {
@@ -1626,6 +1767,7 @@
         renderOverlays();
         updateStatus();
         updateBubbleToolState();
+        updateUndoRedoState();
       };
 
       const findPageByBaseName = (baseName) =>
@@ -1653,6 +1795,8 @@
               jsonName: "",
               overlapOrdered: false,
               manualOrderChanged: false,
+              undoStack: [],
+              redoStack: [],
             });
           }
           if (currentPageIndex === -1 && index === 0) {
@@ -1701,6 +1845,8 @@
                 existing.jsonName = file.name;
                 existing.overlapOrdered = false;
                 existing.manualOrderChanged = false;
+                existing.undoStack = [];
+                existing.redoStack = [];
               } else {
                 pages.push({
                   id: crypto.randomUUID(),
@@ -1712,6 +1858,8 @@
                   jsonName: file.name,
                   overlapOrdered: false,
                   manualOrderChanged: false,
+                  undoStack: [],
+                  redoStack: [],
                 });
               }
             } catch (err) {
@@ -1870,6 +2018,7 @@
         const item = jsonData.items[index];
         const bbox = getItemBbox(item);
         if (!bbox) return;
+        recordHistory(getCurrentPage(), "resize-bubble");
         const coords = getPointerImageCoords(event);
         if (!coords) return;
         event.stopPropagation();
@@ -2049,6 +2198,7 @@
         if (!coords) return;
         const bounds = getResizeBounds(jsonData);
         const normalized = normalizeDrawBounds(drawStart, coords, bounds);
+        recordHistory(getCurrentPage(), "add-bubble");
         const newItem = {
           id: getNextBubbleId(jsonData.items),
           text_original: "",
@@ -2338,6 +2488,23 @@
           downloadJson();
           return;
         }
+        if (event.ctrlKey || event.metaKey) {
+          const key = event.key.toLowerCase();
+          if (key === "z") {
+            event.preventDefault();
+            if (event.shiftKey) {
+              redoChange();
+            } else {
+              undoChange();
+            }
+            return;
+          }
+          if (key === "y") {
+            event.preventDefault();
+            redoChange();
+            return;
+          }
+        }
         if (!event.ctrlKey && !event.metaKey) {
           if (event.key === "+" || event.key === "=") {
             event.preventDefault();
@@ -2423,6 +2590,7 @@
       removeBubbleBtn.addEventListener("click", () => {
         const jsonData = getCurrentJson();
         if (!jsonData || selectedIndex < 0) return;
+        recordHistory(getCurrentPage(), "remove-bubble");
         jsonData.items.splice(selectedIndex, 1);
         if (jsonData.items.length) {
           selectBubble(Math.min(selectedIndex, jsonData.items.length - 1));
@@ -2434,6 +2602,9 @@
         updateStatus();
         updateBubbleToolState();
       });
+
+      undoBtn.addEventListener("click", () => undoChange());
+      redoBtn.addEventListener("click", () => redoChange());
 
       // How to run locally:
       // 1) Save this file as index.html.

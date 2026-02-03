@@ -7,6 +7,7 @@ This is a single-page helper for reviewing manga bubble detection JSON alongside
 - Upload multiple images and JSON files to align pages by filename.
 - Navigate bubbles using the list or keyboard.
 - Zoom and pan the preview to inspect text regions, including mouse-wheel zooming.
+- Undo and redo bubble edits, reorders, and region adjustments.
 - Export the current or all JSON files after edits.
 
 ## Keyboard Shortcuts
@@ -14,6 +15,8 @@ This is a single-page helper for reviewing manga bubble detection JSON alongside
 | Action | Shortcut |
 | --- | --- |
 | Save current JSON | `Ctrl/Cmd + S` |
+| Undo change | `Ctrl/Cmd + Z` |
+| Redo change | `Ctrl/Cmd + Shift + Z` or `Ctrl + Y` |
 | Next bubble | `Arrow Right` |
 | Previous bubble | `Arrow Left` |
 | Zoom in | `+` or `=` |
