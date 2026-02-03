@@ -30,6 +30,14 @@ Services:
 - MinIO: http://localhost:9001
   - `minio-init` is an init container that exits after creating the `mth` bucket.
 
+### Web environment
+
+The Next.js app proxies API requests through `/api/backend/*`. Configure the API base URL if needed:
+
+```bash
+export API_BASE_URL="http://localhost:4000"
+```
+
 ## Prisma
 
 Schema: `apps/api/prisma/schema.prisma`

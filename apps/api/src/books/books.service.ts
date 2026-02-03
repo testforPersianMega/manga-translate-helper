@@ -26,6 +26,7 @@ export class BooksService {
         language: dto.language,
         status: dto.status,
         coverImageUrl: dto.coverImageUrl,
+        meta: dto.meta,
         createdById
       }
     });
@@ -37,7 +38,8 @@ export class BooksService {
       where: { id },
       data: {
         ...dto,
-        altTitles: dto.altTitles ?? undefined
+        altTitles: dto.altTitles ?? undefined,
+        meta: dto.meta
       }
     });
   }

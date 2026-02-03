@@ -24,6 +24,7 @@ async function main() {
       description: "Seeded sample",
       language: "en",
       status: "ONGOING",
+      meta: { genre: "Action", rating: "Teen" },
       createdById: admin.id
     }
   });
@@ -34,7 +35,9 @@ async function main() {
       number: "1",
       title: "Chapter One",
       orderIndex: 1,
-      publishStatus: "DRAFT"
+      publishStatus: "DRAFT",
+      imageUrls: ["https://example.com/page-1.jpg"],
+      sourceJson: { panels: [{ id: "p1", text: "こんにちは" }] }
     }
   });
 
@@ -68,6 +71,22 @@ async function main() {
           }
         ]
       }
+    }
+  });
+
+  await prisma.userBook.create({
+    data: {
+      userId: admin.id,
+      bookId: book.id
+    }
+  });
+
+  await prisma.translation.create({
+    data: {
+      chapterId: chapter.id,
+      userId: admin.id,
+      translatedJson: { panels: [{ id: "p1", text: "Hello" }] },
+      status: "DRAFT"
     }
   });
 }

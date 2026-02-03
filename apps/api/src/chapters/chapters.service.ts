@@ -20,12 +20,25 @@ export class ChaptersService {
 
   async create(role: string, dto: CreateChapterDto) {
     assertRole(role, ["ADMIN", "EDITOR"]);
-    return this.prisma.chapter.create({ data: dto });
+    return this.prisma.chapter.create({
+      data: {
+        ...dto,
+        imageUrls: dto.imageUrls ?? [],
+        sourceJson: dto.sourceJson
+      }
+    });
   }
 
   async update(id: string, role: string, dto: UpdateChapterDto) {
     assertRole(role, ["ADMIN", "EDITOR"]);
-    return this.prisma.chapter.update({ where: { id }, data: dto });
+    return this.prisma.chapter.update({
+      where: { id },
+      data: {
+        ...dto,
+        imageUrls: dto.imageUrls ?? undefined,
+        sourceJson: dto.sourceJson
+      }
+    });
   }
 
   async remove(id: string, role: string) {

@@ -1,8 +1,15 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
 export default function HomePage() {
-  return (
-    <main>
-      <h2>Welcome</h2>
-      <p>Use the admin navigation to manage books, chapters, pages, and projects.</p>
-    </main>
-  );
+  const cookieStore = cookies();
+  const accessToken = cookieStore.get("mth_access")?.value;
+  const role = cookieStore.get("mth_role")?.value;
+  if (!accessToken) {
+    redirect("/login");
+  }
+  if (role === "ADMIN") {
+    redirect("/admin");
+  }
+  redirect("/app");
 }

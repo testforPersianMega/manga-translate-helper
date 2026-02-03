@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString } from "class-validator";
+import { IsArray, IsEnum, IsInt, IsObject, IsOptional, IsString } from "class-validator";
 
 export enum PublishStatusDto {
   DRAFT = "DRAFT",
@@ -21,6 +21,14 @@ export class CreateChapterDto {
 
   @IsEnum(PublishStatusDto)
   publishStatus!: PublishStatusDto;
+
+  @IsOptional()
+  @IsArray()
+  imageUrls?: string[];
+
+  @IsOptional()
+  @IsObject()
+  sourceJson?: Record<string, unknown>;
 }
 
 export class UpdateChapterDto {
@@ -39,4 +47,12 @@ export class UpdateChapterDto {
   @IsOptional()
   @IsEnum(PublishStatusDto)
   publishStatus?: PublishStatusDto;
+
+  @IsOptional()
+  @IsArray()
+  imageUrls?: string[];
+
+  @IsOptional()
+  @IsObject()
+  sourceJson?: Record<string, unknown>;
 }

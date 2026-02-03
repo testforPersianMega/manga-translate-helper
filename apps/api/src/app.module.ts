@@ -11,6 +11,8 @@ import { TranslationEntriesModule } from "./translation-entries/translation-entr
 import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { PrismaService } from "./common/prisma.service";
 import { AssetsModule } from "./assets/assets.module";
+import { UserBooksModule } from "./user-books/user-books.module";
+import { TranslationsModule } from "./translations/translations.module";
 
 @Module({
   imports: [
@@ -29,7 +31,9 @@ import { AssetsModule } from "./assets/assets.module";
     TranslationProjectsModule,
     TranslationEntriesModule,
     ActivityLogModule,
-    AssetsModule
+    AssetsModule,
+    UserBooksModule,
+    TranslationsModule
   ],
   providers: [PrismaService]
 })
