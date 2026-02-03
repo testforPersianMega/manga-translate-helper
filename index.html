@@ -501,12 +501,40 @@
       }
 
       .history-list li {
-        font-size: 13px;
-        padding: 6px 8px;
+        margin: 0;
+      }
+
+      .history-item {
+        width: 100%;
+        text-align: left;
+        display: grid;
+        gap: 4px;
+        padding: 8px 10px;
         border-radius: 8px;
         background: #fff;
         border: 1px solid #e2e8f0;
         color: #1f2937;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .history-item:hover {
+        border-color: rgba(59, 130, 246, 0.6);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+      }
+
+      .history-item-title {
+        font-weight: 600;
+      }
+
+      .history-item-meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .history-item-time {
+        font-size: 11px;
+        color: #94a3b8;
       }
 
       .history-list li.empty {
@@ -713,6 +741,9 @@
             <button type="button" id="historyRedoBtn" class="action-button">
               Redo
             </button>
+            <button type="button" id="historyClearBtn" class="action-button">
+              Clear History
+            </button>
           </div>
           <div class="history-meta" id="historySummary">
             No changes yet.
@@ -765,6 +796,7 @@
       const redoBtn = document.getElementById("redoBtn");
       const historyUndoBtn = document.getElementById("historyUndoBtn");
       const historyRedoBtn = document.getElementById("historyRedoBtn");
+      const historyClearBtn = document.getElementById("historyClearBtn");
       const historySummary = document.getElementById("historySummary");
       const undoHistoryList = document.getElementById("undoHistoryList");
       const redoHistoryList = document.getElementById("redoHistoryList");
@@ -851,7 +883,86 @@
         return labels[normalized] || normalized.replace(/-/g, " ");
       };
 
-      const renderHistoryList = (listElement, items) => {
+      const formatHistoryTime = (timestamp) => {
+        if (!timestamp) return "";
+        return new Date(timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      };
+
+      const truncateHistoryText = (value, maxLength = 36) => {
+        if (!value) return "";
+        const trimmed = String(value).trim().replace(/\s+/g, " ");
+        if (trimmed.length <= maxLength) return trimmed;
+        return `${trimmed.slice(0, maxLength - 1)}…`;
+      };
+
+      const getHistoryBubbleDetails = (page, source) => {
+        if (!page?.jsonData?.items?.length) return {};
+        const items = page.jsonData.items;
+        if (source === "add-bubble") {
+          return {
+            id: getNextBubbleId(items),
+          };
+        }
+        const item = items[selectedIndex] ?? null;
+        if (!item) return {};
+        return {
+          id: item.id ?? selectedIndex + 1,
+          order: Number.isFinite(Number(item.order)) ? item.order : undefined,
+          type: item.bubble_type,
+          text: truncateHistoryText(item.text || item.text_original || ""),
+        };
+      };
+
+      const formatHistoryDetail = (details) => {
+        if (!details) return "";
+        const parts = [];
+        if (details.id !== undefined) {
+          parts.push(`Bubble #${details.id}`);
+        }
+        if (details.order !== undefined) {
+          parts.push(`Order ${details.order}`);
+        }
+        if (details.type) {
+          parts.push(`Type: ${details.type}`);
+        }
+        if (details.text) {
+          parts.push(`Text: “${details.text}”`);
+        }
+        return parts.join(" • ");
+      };
+
+      const createHistoryEntry = (page, source) => {
+        const detail = formatHistoryDetail(
+          getHistoryBubbleDetails(page, source),
+        );
+        return {
+          label: formatHistoryLabel(source),
+          detail,
+          timestamp: Date.now(),
+        };
+      };
+
+      const jumpToHistory = (stackType, displayIndex) => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        ensureHistoryState(page);
+        const targetStack = stackType === "redo" ? page.redoStack : page.undoStack;
+        if (!targetStack.length) return;
+        const steps = Math.max(1, Math.min(displayIndex + 1, targetStack.length));
+        for (let i = 0; i < steps; i += 1) {
+          if (stackType === "redo") {
+            redoChange();
+          } else {
+            undoChange();
+          }
+        }
+      };
+
+      const renderHistoryList = (listElement, items, stackType) => {
         listElement.innerHTML = "";
         if (!items.length) {
           const emptyItem = document.createElement("li");
@@ -860,9 +971,29 @@
           listElement.appendChild(emptyItem);
           return;
         }
-        items.forEach((entry) => {
+        items.forEach((entry, index) => {
           const item = document.createElement("li");
-          item.textContent = entry.label || "Edit";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "history-item";
+          button.dataset.index = String(index);
+          button.dataset.stack = stackType;
+          const title = document.createElement("span");
+          title.className = "history-item-title";
+          title.textContent = entry.label || "Edit";
+          button.appendChild(title);
+          const meta = document.createElement("span");
+          meta.className = "history-item-meta";
+          meta.textContent = entry.detail || "No details";
+          button.appendChild(meta);
+          const time = document.createElement("span");
+          time.className = "history-item-time";
+          time.textContent = formatHistoryTime(entry.timestamp);
+          button.appendChild(time);
+          button.addEventListener("click", () => {
+            jumpToHistory(stackType, index);
+          });
+          item.appendChild(button);
           listElement.appendChild(item);
         });
       };
@@ -874,10 +1005,11 @@
         historySummary.textContent = page?.jsonData
           ? `${undoStack.length} undo • ${redoStack.length} redo`
           : "No changes yet.";
-        renderHistoryList(undoHistoryList, [...undoStack].reverse());
-        renderHistoryList(redoHistoryList, [...redoStack].reverse());
+        renderHistoryList(undoHistoryList, [...undoStack].reverse(), "undo");
+        renderHistoryList(redoHistoryList, [...redoStack].reverse(), "redo");
         historyUndoBtn.disabled = undoStack.length === 0;
         historyRedoBtn.disabled = redoStack.length === 0;
+        historyClearBtn.disabled = undoStack.length === 0 && redoStack.length === 0;
       };
 
       const updateUndoRedoState = () => {
@@ -894,10 +1026,13 @@
       const pushHistorySnapshot = (page, snapshot, source) => {
         if (!page?.jsonData || !snapshot || isHistoryApplying) return;
         ensureHistoryState(page);
+        const entry = createHistoryEntry(page, source);
         page.undoStack.push({
           jsonData: snapshot,
           manualOrderChanged: page.manualOrderChanged ?? false,
-          label: formatHistoryLabel(source),
+          label: entry.label,
+          detail: entry.detail,
+          timestamp: entry.timestamp,
         });
         page.redoStack = [];
         updateUndoRedoState();
@@ -946,6 +1081,8 @@
           jsonData: cloneJsonData(page.jsonData),
           manualOrderChanged: page.manualOrderChanged ?? false,
           label: snapshot?.label ?? "Edit",
+          detail: snapshot?.detail ?? "No details",
+          timestamp: snapshot?.timestamp ?? Date.now(),
         });
         const nextSnapshot =
           snapshot && snapshot.jsonData ? snapshot.jsonData : snapshot;
@@ -968,6 +1105,8 @@
           jsonData: cloneJsonData(page.jsonData),
           manualOrderChanged: page.manualOrderChanged ?? false,
           label: snapshot?.label ?? "Edit",
+          detail: snapshot?.detail ?? "No details",
+          timestamp: snapshot?.timestamp ?? Date.now(),
         });
         const nextSnapshot =
           snapshot && snapshot.jsonData ? snapshot.jsonData : snapshot;
@@ -978,6 +1117,15 @@
         }
         isHistoryApplying = false;
         refreshAfterHistoryChange();
+      };
+
+      const clearHistory = () => {
+        const page = getCurrentPage();
+        if (!page?.jsonData) return;
+        ensureHistoryState(page);
+        page.undoStack = [];
+        page.redoStack = [];
+        updateUndoRedoState();
       };
 
       const logOrderEvent = (message, details = {}) => {
@@ -2746,6 +2894,7 @@
       redoBtn.addEventListener("click", () => redoChange());
       historyUndoBtn.addEventListener("click", () => undoChange());
       historyRedoBtn.addEventListener("click", () => redoChange());
+      historyClearBtn.addEventListener("click", () => clearHistory());
 
       // How to run locally:
       // 1) Save this file as index.html.
