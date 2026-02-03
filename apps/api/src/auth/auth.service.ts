@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import type { RefreshToken } from "@prisma/client";
 import { PrismaService } from "../common/prisma.service";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
@@ -38,7 +39,7 @@ export class AuthService {
   }
 
   async refresh(userId: string, refreshToken: string) {
-    const tokens = await this.prisma.refreshToken.findMany({
+    const tokens: RefreshToken[] = await this.prisma.refreshToken.findMany({
       where: {
         userId,
         revokedAt: null,
