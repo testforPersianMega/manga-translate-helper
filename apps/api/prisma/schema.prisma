@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  TRANSLATOR
+  VIEWER
+}
+
+enum BookStatus {
+  ONGOING
+  COMPLETED
+  HIATUS
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  DONE
+  ARCHIVED
+}
+
+enum TranslationEntryStatus {
+  TODO
+  IN_PROGRESS
+  REVIEWED
+  FINAL
+}
+
+enum AssetType {
+  COVER
+  PAGE_IMAGE
+  OTHER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  role         Role     @default(VIEWER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLoginAt  DateTime?
+  isBanned     Boolean  @default(false)
+
+  books           Book[]
+  projects        TranslationProject[] @relation("ProjectOwner")
+  assignments     ProjectAssignment[]
+  translationEdits TranslationEntry[] @relation("TranslationEntryUpdatedBy")
+  activityLogs    ActivityLog[]
+  comments        Comment[]
+  refreshTokens   RefreshToken[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Book {
+  id            String      @id @default(uuid())
+  title         String
+  slug          String      @unique
+  altTitles     String[]
+  description   String?
+  language      String
+  status        BookStatus
+  coverImageUrl String?
+  createdById   String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  createdBy User     @relation(fields: [createdById], references: [id])
+  chapters  Chapter[]
+  assets    Asset[]
+
+  @@index([title])
+  @@index([slug])
+  @@index([status])
+}
+
+model Chapter {
+  id            String        @id @default(uuid())
+  bookId        String
+  number        String
+  title         String?
+  orderIndex    Int
+  publishStatus PublishStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  book       Book    @relation(fields: [bookId], references: [id])
+  pages      Page[]
+  projects   TranslationProject[]
+
+  @@unique([bookId, number])
+  @@index([bookId, orderIndex])
+}
+
+model Page {
+  id         String   @id @default(uuid())
+  chapterId  String
+  pageNumber Int
+  imageUrl   String
+  width      Int
+  height     Int
+  checksum   String
+  createdAt  DateTime @default(now())
+
+  chapter           Chapter            @relation(fields: [chapterId], references: [id])
+  translationEntries TranslationEntry[]
+
+  @@unique([chapterId, pageNumber])
+  @@index([chapterId])
+}
+
+model TranslationProject {
+  id        String        @id @default(uuid())
+  chapterId String
+  ownerId   String
+  status    ProjectStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  chapter     Chapter @relation(fields: [chapterId], references: [id])
+  owner       User    @relation("ProjectOwner", fields: [ownerId], references: [id])
+  assignments ProjectAssignment[]
+  entries     TranslationEntry[]
+  comments    Comment[]
+
+  @@index([chapterId])
+  @@index([ownerId])
+}
+
+model ProjectAssignment {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  assignedAt DateTime @default(now())
+
+  project TranslationProject @relation(fields: [projectId], references: [id])
+  user    User               @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+model TranslationEntry {
+  id             String                 @id @default(uuid())
+  projectId      String
+  pageId         String
+  box            Json
+  sourceText     String
+  translatedText String
+  status         TranslationEntryStatus @default(TODO)
+  metadata       Json?
+  updatedById    String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  project   TranslationProject @relation(fields: [projectId], references: [id])
+  page      Page               @relation(fields: [pageId], references: [id])
+  updatedBy User?              @relation("TranslationEntryUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([projectId, pageId])
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  projectId  String
+  authorId   String
+  body       String
+  createdAt  DateTime @default(now())
+
+  project TranslationProject @relation(fields: [projectId], references: [id])
+  author  User               @relation(fields: [authorId], references: [id])
+
+  @@index([projectId])
+}
+
+model Asset {
+  id         String    @id @default(uuid())
+  type       AssetType
+  url        String
+  storageKey String
+  checksum   String
+  createdAt  DateTime  @default(now())
+  bookId     String?
+
+  book Book? @relation(fields: [bookId], references: [id])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+}
