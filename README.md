@@ -44,3 +44,22 @@ step through changes directly from the list.
 1. Open `index.html` in your browser.
 2. Upload images and JSON files with matching base names.
 3. Select bubbles to edit translations and download updated JSON.
+
+## Project Structure
+
+```
+.
+├── css/
+│   └── styles.css
+├── js/
+│   └── app.js
+├── index.html
+└── README.md
+```
+
+### File Guide
+
+- `index.html`: The main page structure and UI markup for the app.
+- `css/styles.css`: All visual styling for the layout, toolbar, panels, and overlays.
+- `js/app.js`: The full application logic (state, rendering, interactions, and history).
+- `README.md`: Project overview, usage, and file documentation.
