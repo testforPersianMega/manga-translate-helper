@@ -460,6 +460,62 @@
         cursor: not-allowed;
       }
 
+      .history-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .history-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .history-meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .history-list {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px;
+        background: #f8fafc;
+        max-height: 160px;
+        overflow: auto;
+      }
+
+      .history-list h3 {
+        margin: 0 0 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .history-list ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 6px;
+      }
+
+      .history-list li {
+        font-size: 13px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: #1f2937;
+      }
+
+      .history-list li.empty {
+        color: var(--muted);
+        font-style: italic;
+        border-style: dashed;
+        background: transparent;
+      }
+
       @media (max-width: 1100px) {
         main {
           grid-template-columns: 180px minmax(0, 1fr) 280px;
@@ -648,6 +704,28 @@
             value="80"
           />
         </div>
+        <h2>History</h2>
+        <section class="history-panel">
+          <div class="history-actions">
+            <button type="button" id="historyUndoBtn" class="action-button">
+              Undo
+            </button>
+            <button type="button" id="historyRedoBtn" class="action-button">
+              Redo
+            </button>
+          </div>
+          <div class="history-meta" id="historySummary">
+            No changes yet.
+          </div>
+          <div class="history-list" aria-live="polite">
+            <h3>Undo</h3>
+            <ul id="undoHistoryList"></ul>
+          </div>
+          <div class="history-list" aria-live="polite">
+            <h3>Redo</h3>
+            <ul id="redoHistoryList"></ul>
+          </div>
+        </section>
       </section>
     </main>
 
@@ -685,6 +763,11 @@
       const removeBubbleBtn = document.getElementById("removeBubbleBtn");
       const undoBtn = document.getElementById("undoBtn");
       const redoBtn = document.getElementById("redoBtn");
+      const historyUndoBtn = document.getElementById("historyUndoBtn");
+      const historyRedoBtn = document.getElementById("historyRedoBtn");
+      const historySummary = document.getElementById("historySummary");
+      const undoHistoryList = document.getElementById("undoHistoryList");
+      const redoHistoryList = document.getElementById("redoHistoryList");
 
       const bubbleTypeOptions = Array.from(bubbleType.options).map(
         (option) => option.value,
@@ -752,6 +835,51 @@
         page.redoStack = page.redoStack ?? [];
       };
 
+      const formatHistoryLabel = (source) => {
+        const normalized = (source || "edit").replace(/_/g, "-");
+        const labels = {
+          "add-bubble": "Add bubble",
+          "remove-bubble": "Remove bubble",
+          "resize-bubble": "Resize bubble",
+          "drag-reorder": "Reorder bubble",
+          "manual-order-change": "Edit order",
+          "bubble-type-change": "Change bubble type",
+          "auto-order": "Auto order bubbles",
+          "text-edit": "Edit translation",
+          "text-original-edit": "Edit original text",
+        };
+        return labels[normalized] || normalized.replace(/-/g, " ");
+      };
+
+      const renderHistoryList = (listElement, items) => {
+        listElement.innerHTML = "";
+        if (!items.length) {
+          const emptyItem = document.createElement("li");
+          emptyItem.className = "empty";
+          emptyItem.textContent = "No entries";
+          listElement.appendChild(emptyItem);
+          return;
+        }
+        items.forEach((entry) => {
+          const item = document.createElement("li");
+          item.textContent = entry.label || "Edit";
+          listElement.appendChild(item);
+        });
+      };
+
+      const updateHistoryPanel = () => {
+        const page = getCurrentPage();
+        const undoStack = page?.undoStack ?? [];
+        const redoStack = page?.redoStack ?? [];
+        historySummary.textContent = page?.jsonData
+          ? `${undoStack.length} undo • ${redoStack.length} redo`
+          : "No changes yet.";
+        renderHistoryList(undoHistoryList, [...undoStack].reverse());
+        renderHistoryList(redoHistoryList, [...redoStack].reverse());
+        historyUndoBtn.disabled = undoStack.length === 0;
+        historyRedoBtn.disabled = redoStack.length === 0;
+      };
+
       const updateUndoRedoState = () => {
         const page = getCurrentPage();
         const canUndo =
@@ -760,6 +888,7 @@
           Boolean(page?.jsonData) && (page?.redoStack?.length ?? 0) > 0;
         undoBtn.disabled = !canUndo;
         redoBtn.disabled = !canRedo;
+        updateHistoryPanel();
       };
 
       const pushHistorySnapshot = (page, snapshot, source) => {
@@ -768,6 +897,7 @@
         page.undoStack.push({
           jsonData: snapshot,
           manualOrderChanged: page.manualOrderChanged ?? false,
+          label: formatHistoryLabel(source),
         });
         page.redoStack = [];
         updateUndoRedoState();
@@ -815,6 +945,7 @@
         page.redoStack.push({
           jsonData: cloneJsonData(page.jsonData),
           manualOrderChanged: page.manualOrderChanged ?? false,
+          label: snapshot?.label ?? "Edit",
         });
         const nextSnapshot =
           snapshot && snapshot.jsonData ? snapshot.jsonData : snapshot;
@@ -836,6 +967,7 @@
         page.undoStack.push({
           jsonData: cloneJsonData(page.jsonData),
           manualOrderChanged: page.manualOrderChanged ?? false,
+          label: snapshot?.label ?? "Edit",
         });
         const nextSnapshot =
           snapshot && snapshot.jsonData ? snapshot.jsonData : snapshot;
@@ -2478,19 +2610,24 @@
         );
       };
 
+      const isKeyboardCombo = (event, codes, keys = []) => {
+        const codeMatch = codes.includes(event.code);
+        const keyMatch = keys.includes(event.key);
+        return codeMatch || keyMatch;
+      };
+
       document.addEventListener("keydown", (event) => {
         if (isTypingTarget(event.target)) return;
         if (
           (event.ctrlKey || event.metaKey) &&
-          event.key.toLowerCase() === "s"
+          isKeyboardCombo(event, ["KeyS"], ["s", "S"])
         ) {
           event.preventDefault();
           downloadJson();
           return;
         }
         if (event.ctrlKey || event.metaKey) {
-          const key = event.key.toLowerCase();
-          if (key === "z") {
+          if (isKeyboardCombo(event, ["KeyZ"], ["z", "Z"])) {
             event.preventDefault();
             if (event.shiftKey) {
               redoChange();
@@ -2499,24 +2636,26 @@
             }
             return;
           }
-          if (key === "y") {
+          if (isKeyboardCombo(event, ["KeyY"], ["y", "Y"])) {
             event.preventDefault();
             redoChange();
             return;
           }
         }
         if (!event.ctrlKey && !event.metaKey) {
-          if (event.key === "+" || event.key === "=") {
+          if (
+            isKeyboardCombo(event, ["Equal", "NumpadAdd"], ["+", "="])
+          ) {
             event.preventDefault();
             applyZoom(zoomLevel + ZOOM_STEP);
             return;
           }
-          if (event.key === "-") {
+          if (isKeyboardCombo(event, ["Minus", "NumpadSubtract"], ["-"])) {
             event.preventDefault();
             applyZoom(zoomLevel - ZOOM_STEP);
             return;
           }
-          if (event.key === "0") {
+          if (isKeyboardCombo(event, ["Digit0", "Numpad0"], ["0"])) {
             event.preventDefault();
             panX = 0;
             panY = 0;
@@ -2605,6 +2744,8 @@
 
       undoBtn.addEventListener("click", () => undoChange());
       redoBtn.addEventListener("click", () => redoChange());
+      historyUndoBtn.addEventListener("click", () => undoChange());
+      historyRedoBtn.addEventListener("click", () => redoChange());
 
       // How to run locally:
       // 1) Save this file as index.html.
