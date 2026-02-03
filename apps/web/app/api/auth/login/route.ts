@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
 import { apiBaseUrl } from "../../../lib/api";
+import { decodeJwtPayload } from "../../../lib/jwt";
 
 type LoginPayload = {
   email: string;
   password: string;
 };
-
-function decodeJwtPayload(token: string): { role?: string; sub?: string } {
-  const payload = token.split(".")[1];
-  if (!payload) {
-    return {};
-  }
-  const decoded = Buffer.from(payload, "base64").toString("utf-8");
-  try {
-    return JSON.parse(decoded);
-  } catch {
-    return {};
-  }
-}
 
 export async function POST(request: Request) {
   const body = (await request.json()) as LoginPayload;
