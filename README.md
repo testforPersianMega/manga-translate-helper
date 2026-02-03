@@ -28,6 +28,7 @@ Services:
 - Swagger: http://localhost:4000/api/docs
 - Web: http://localhost:3000
 - MinIO: http://localhost:9001
+  - `minio-init` is an init container that exits after creating the `mth` bucket.
 
 ## Prisma
 
