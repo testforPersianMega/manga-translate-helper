@@ -8,10 +8,10 @@ export enum BookStatusDto {
 
 export class CreateBookDto {
   @IsString()
-  title: string;
+  title!: string;
 
   @IsString()
-  slug: string;
+  slug!: string;
 
   @IsOptional()
   @IsArray()
@@ -22,10 +22,10 @@ export class CreateBookDto {
   description?: string;
 
   @IsString()
-  language: string;
+  language!: string;
 
   @IsEnum(BookStatusDto)
-  status: BookStatusDto;
+  status!: BookStatusDto;
 
   @IsOptional()
   @IsUrl()

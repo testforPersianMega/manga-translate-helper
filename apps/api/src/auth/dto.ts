@@ -2,51 +2,51 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from "class-vali
 
 export class RegisterDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @IsNotEmpty()
-  username: string;
+  username!: string;
 
   @IsString()
   @MinLength(8)
-  password: string;
+  password!: string;
 }
 
 export class LoginDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
-  password: string;
+  password!: string;
 }
 
 export class RefreshDto {
   @IsString()
-  userId: string;
+  userId!: string;
 
   @IsString()
-  refreshToken: string;
+  refreshToken!: string;
 }
 
 export class ResetPasswordRequestDto {
   @IsEmail()
-  email: string;
+  email!: string;
 }
 
 export class ResetPasswordConfirmDto {
   @IsString()
-  token: string;
+  token!: string;
 
   @IsString()
   @MinLength(8)
-  newPassword: string;
+  newPassword!: string;
 }
 
 export class UpdatePasswordDto {
   @IsString()
   @MinLength(8)
-  newPassword: string;
+  newPassword!: string;
 
   @IsOptional()
   @IsString()

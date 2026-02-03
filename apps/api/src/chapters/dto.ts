@@ -7,20 +7,20 @@ export enum PublishStatusDto {
 
 export class CreateChapterDto {
   @IsString()
-  bookId: string;
+  bookId!: string;
 
   @IsString()
-  number: string;
+  number!: string;
 
   @IsOptional()
   @IsString()
   title?: string;
 
   @IsInt()
-  orderIndex: number;
+  orderIndex!: number;
 
   @IsEnum(PublishStatusDto)
-  publishStatus: PublishStatusDto;
+  publishStatus!: PublishStatusDto;
 }
 
 export class UpdateChapterDto {
