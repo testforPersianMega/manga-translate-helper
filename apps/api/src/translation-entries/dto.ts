@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { IsEnum, IsObject, IsOptional, IsString } from "class-validator";
 
 export enum TranslationEntryStatusDto {
@@ -27,7 +28,7 @@ export class CreateTranslationEntryDto {
   status!: TranslationEntryStatusDto;
 
   @IsOptional()
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.JsonObject;
 }
 
 export class UpdateTranslationEntryDto {
@@ -48,5 +49,5 @@ export class UpdateTranslationEntryDto {
   status?: TranslationEntryStatusDto;
 
   @IsOptional()
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.JsonObject;
 }
