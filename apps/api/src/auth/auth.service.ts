@@ -5,6 +5,8 @@ import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { LoginDto, RegisterDto } from "./dto";
 
+type RefreshTokenRecord = Awaited<ReturnType<PrismaService["refreshToken"]["findMany"]>>[number];
+
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService, private readonly jwtService: JwtService) {}
@@ -38,7 +40,7 @@ export class AuthService {
   }
 
   async refresh(userId: string, refreshToken: string) {
-    const tokens = await this.prisma.refreshToken.findMany({
+    const tokens: RefreshTokenRecord[] = await this.prisma.refreshToken.findMany({
       where: {
         userId,
         revokedAt: null,
