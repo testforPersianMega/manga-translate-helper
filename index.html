@@ -312,8 +312,8 @@
 
       .bubble-overlay {
         position: absolute;
-        border: 2px solid rgba(255, 255, 255, 0.7);
-        background: rgba(59, 130, 246, 0.12);
+        border: 2px solid rgb(243 0 0 / 39%);
+        background: rgb(245 0 0 / 6%);
         border-radius: 6px;
         pointer-events: auto;
         cursor: pointer;
@@ -745,9 +745,7 @@
               Clear History
             </button>
           </div>
-          <div class="history-meta" id="historySummary">
-            No changes yet.
-          </div>
+          <div class="history-meta" id="historySummary">No changes yet.</div>
           <div class="history-list" aria-live="polite">
             <h3>Undo</h3>
             <ul id="undoHistoryList"></ul>
@@ -950,9 +948,13 @@
         const page = getCurrentPage();
         if (!page?.jsonData) return;
         ensureHistoryState(page);
-        const targetStack = stackType === "redo" ? page.redoStack : page.undoStack;
+        const targetStack =
+          stackType === "redo" ? page.redoStack : page.undoStack;
         if (!targetStack.length) return;
-        const steps = Math.max(1, Math.min(displayIndex + 1, targetStack.length));
+        const steps = Math.max(
+          1,
+          Math.min(displayIndex + 1, targetStack.length),
+        );
         for (let i = 0; i < steps; i += 1) {
           if (stackType === "redo") {
             redoChange();
@@ -1009,7 +1011,8 @@
         renderHistoryList(redoHistoryList, [...redoStack].reverse(), "redo");
         historyUndoBtn.disabled = undoStack.length === 0;
         historyRedoBtn.disabled = redoStack.length === 0;
-        historyClearBtn.disabled = undoStack.length === 0 && redoStack.length === 0;
+        historyClearBtn.disabled =
+          undoStack.length === 0 && redoStack.length === 0;
       };
 
       const updateUndoRedoState = () => {
@@ -2791,9 +2794,7 @@
           }
         }
         if (!event.ctrlKey && !event.metaKey) {
-          if (
-            isKeyboardCombo(event, ["Equal", "NumpadAdd"], ["+", "="])
-          ) {
+          if (isKeyboardCombo(event, ["Equal", "NumpadAdd"], ["+", "="])) {
             event.preventDefault();
             applyZoom(zoomLevel + ZOOM_STEP);
             return;
