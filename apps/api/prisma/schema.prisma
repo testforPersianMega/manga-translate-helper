@@ -38,6 +38,11 @@ enum TranslationEntryStatus {
   FINAL
 }
 
+enum TranslationStatus {
+  DRAFT
+  COMPLETE
+}
+
 enum AssetType {
   COVER
   PAGE_IMAGE
@@ -62,6 +67,8 @@ model User {
   activityLogs    ActivityLog[]
   comments        Comment[]
   refreshTokens   RefreshToken[]
+  userBooks       UserBook[]
+  translations    Translation[]
 
   @@index([role])
 }
@@ -89,6 +96,7 @@ model Book {
   language      String
   status        BookStatus
   coverImageUrl String?
+  meta          Json?
   createdById   String
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -96,6 +104,7 @@ model Book {
   createdBy User     @relation(fields: [createdById], references: [id])
   chapters  Chapter[]
   assets    Asset[]
+  userBooks UserBook[]
 
   @@index([title])
   @@index([slug])
@@ -109,12 +118,15 @@ model Chapter {
   title         String?
   orderIndex    Int
   publishStatus PublishStatus @default(DRAFT)
+  imageUrls     String[]      @default([])
+  sourceJson    Json?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   book       Book    @relation(fields: [bookId], references: [id])
   pages      Page[]
   projects   TranslationProject[]
+  translations Translation[]
 
   @@unique([bookId, number])
   @@index([bookId, orderIndex])
@@ -153,6 +165,34 @@ model TranslationProject {
 
   @@index([chapterId])
   @@index([ownerId])
+}
+
+model Translation {
+  id             String            @id @default(uuid())
+  chapterId      String
+  userId         String
+  translatedJson Json?
+  status         TranslationStatus @default(DRAFT)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  chapter Chapter @relation(fields: [chapterId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([chapterId, userId])
+  @@index([userId])
+}
+
+model UserBook {
+  userId    String
+  bookId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  book Book @relation(fields: [bookId], references: [id])
+
+  @@id([userId, bookId])
+  @@index([bookId])
 }
 
 model ProjectAssignment {

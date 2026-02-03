@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsOptional, IsString, IsUrl } from "class-validator";
+import { IsArray, IsEnum, IsObject, IsOptional, IsString, IsUrl } from "class-validator";
 
 export enum BookStatusDto {
   ONGOING = "ONGOING",
@@ -30,6 +30,10 @@ export class CreateBookDto {
   @IsOptional()
   @IsUrl()
   coverImageUrl?: string;
+
+  @IsOptional()
+  @IsObject()
+  meta?: Record<string, unknown>;
 }
 
 export class UpdateBookDto {
@@ -60,4 +64,8 @@ export class UpdateBookDto {
   @IsOptional()
   @IsUrl()
   coverImageUrl?: string;
+
+  @IsOptional()
+  @IsObject()
+  meta?: Record<string, unknown>;
 }
