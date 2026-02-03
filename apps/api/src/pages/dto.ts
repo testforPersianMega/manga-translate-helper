@@ -2,22 +2,22 @@ import { IsInt, IsOptional, IsString, IsUrl } from "class-validator";
 
 export class CreatePageDto {
   @IsString()
-  chapterId: string;
+  chapterId!: string;
 
   @IsInt()
-  pageNumber: number;
+  pageNumber!: number;
 
   @IsUrl()
-  imageUrl: string;
+  imageUrl!: string;
 
   @IsInt()
-  width: number;
+  width!: number;
 
   @IsInt()
-  height: number;
+  height!: number;
 
   @IsString()
-  checksum: string;
+  checksum!: string;
 }
 
 export class UpdatePageDto {
@@ -44,5 +44,5 @@ export class UpdatePageDto {
 
 export class CreateUploadUrlDto {
   @IsString()
-  contentType: string;
+  contentType!: string;
 }

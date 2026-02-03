@@ -9,22 +9,22 @@ export enum TranslationEntryStatusDto {
 
 export class CreateTranslationEntryDto {
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @IsString()
-  pageId: string;
+  pageId!: string;
 
   @IsObject()
-  box: { x: number; y: number; w: number; h: number };
+  box!: { x: number; y: number; w: number; h: number };
 
   @IsString()
-  sourceText: string;
+  sourceText!: string;
 
   @IsString()
-  translatedText: string;
+  translatedText!: string;
 
   @IsEnum(TranslationEntryStatusDto)
-  status: TranslationEntryStatusDto;
+  status!: TranslationEntryStatusDto;
 
   @IsOptional()
   metadata?: Record<string, unknown>;

@@ -1,4 +1,4 @@
-import { PrismaClient, Role, BookStatus, PublishStatus, ProjectStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
@@ -12,7 +12,7 @@ async function main() {
       email: "admin@example.com",
       username: "admin",
       passwordHash,
-      role: Role.ADMIN
+      role: "ADMIN"
     }
   });
 
@@ -23,7 +23,7 @@ async function main() {
       altTitles: ["サンプル"],
       description: "Seeded sample",
       language: "en",
-      status: BookStatus.ONGOING,
+      status: "ONGOING",
       createdById: admin.id
     }
   });
@@ -34,7 +34,7 @@ async function main() {
       number: "1",
       title: "Chapter One",
       orderIndex: 1,
-      publishStatus: PublishStatus.DRAFT
+      publishStatus: "DRAFT"
     }
   });
 
@@ -53,7 +53,7 @@ async function main() {
     data: {
       chapterId: chapter.id,
       ownerId: admin.id,
-      status: ProjectStatus.ACTIVE,
+      status: "ACTIVE",
       assignments: {
         create: [{ userId: admin.id }]
       },

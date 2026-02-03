@@ -8,7 +8,7 @@ export enum ProjectStatusDto {
 
 export class CreateProjectDto {
   @IsString()
-  chapterId: string;
+  chapterId!: string;
 
   @IsOptional()
   @IsArray()
