@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../common/prisma.service";
 import { assertRole } from "../common/access-control";
 import { UpdateTranslationDto, UpsertTranslationDto } from "./dto";
@@ -30,13 +31,13 @@ export class TranslationsService {
     return this.prisma.translation.upsert({
       where: { chapterId_userId: { chapterId: dto.chapterId, userId: requesterId } },
       update: {
-        translatedJson: dto.translatedJson,
+        translatedJson: dto.translatedJson as Prisma.InputJsonValue | undefined,
         status: dto.status
       },
       create: {
         chapterId: dto.chapterId,
         userId: requesterId,
-        translatedJson: dto.translatedJson,
+        translatedJson: dto.translatedJson as Prisma.InputJsonValue | undefined,
         status: dto.status
       }
     });
@@ -52,7 +53,10 @@ export class TranslationsService {
     }
     return this.prisma.translation.update({
       where: { id },
-      data: dto
+      data: {
+        translatedJson: dto.translatedJson as Prisma.InputJsonValue | undefined,
+        status: dto.status
+      }
     });
   }
 }

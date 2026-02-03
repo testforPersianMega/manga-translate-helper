@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../common/prisma.service";
 import { assertRole } from "../common/access-control";
 import { CreateBookDto, UpdateBookDto } from "./dto";
@@ -26,7 +27,7 @@ export class BooksService {
         language: dto.language,
         status: dto.status,
         coverImageUrl: dto.coverImageUrl,
-        meta: dto.meta,
+        meta: dto.meta as Prisma.InputJsonValue | undefined,
         createdById
       }
     });
@@ -39,7 +40,7 @@ export class BooksService {
       data: {
         ...dto,
         altTitles: dto.altTitles ?? undefined,
-        meta: dto.meta
+        meta: dto.meta as Prisma.InputJsonValue | undefined
       }
     });
   }
