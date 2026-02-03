@@ -1,5 +1,7 @@
 FROM node:20-alpine
 WORKDIR /app
+RUN apk add --no-cache python3 build-base
+ENV PYTHON=/usr/bin/python3
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .
