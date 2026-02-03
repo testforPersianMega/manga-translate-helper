@@ -1,6 +1,9 @@
 {
   "name": "manga-translate-helper",
   "private": true,
+  "engines": {
+    "node": ">=20.11.0 <21"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
