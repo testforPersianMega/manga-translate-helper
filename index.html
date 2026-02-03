@@ -1234,8 +1234,15 @@
         return Math.min(limit, Math.max(-limit, value));
       };
 
+      const updateZoomResetState = () => {
+        const isDefaultZoom = Math.abs(zoomLevel - 1) < 0.001;
+        const isCentered = Math.abs(panX) < 0.5 && Math.abs(panY) < 0.5;
+        zoomResetBtn.disabled = isDefaultZoom && isCentered;
+      };
+
       const updateTransform = () => {
         imageStage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+        updateZoomResetState();
       };
 
       const updateGrabState = () => {
@@ -1260,7 +1267,6 @@
         zoomLabel.textContent = `${Math.round(zoomLevel * 100)}%`;
         zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM + 0.001;
         zoomInBtn.disabled = zoomLevel >= MAX_ZOOM - 0.001;
-        zoomResetBtn.disabled = Math.abs(zoomLevel - 1) < 0.001;
         zoomRange.value = Math.round(zoomLevel * 100);
         updateGrabState();
       };
