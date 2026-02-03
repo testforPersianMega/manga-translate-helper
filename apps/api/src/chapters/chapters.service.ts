@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../common/prisma.service";
 import { assertRole } from "../common/access-control";
 import { CreateChapterDto, UpdateChapterDto } from "./dto";
@@ -24,7 +25,7 @@ export class ChaptersService {
       data: {
         ...dto,
         imageUrls: dto.imageUrls ?? [],
-        sourceJson: dto.sourceJson
+        sourceJson: dto.sourceJson as Prisma.InputJsonValue | undefined
       }
     });
   }
@@ -36,7 +37,7 @@ export class ChaptersService {
       data: {
         ...dto,
         imageUrls: dto.imageUrls ?? undefined,
-        sourceJson: dto.sourceJson
+        sourceJson: dto.sourceJson as Prisma.InputJsonValue | undefined
       }
     });
   }
